@@ -87,12 +87,12 @@ graph TD;
 
 ### Testing and Deployment
 
-- [ ] Write unit tests: Go tests for WASM logic, Jest/Vitest for React components.
-- [ ] Perform end-to-end integration testing with Cypress or Playwright.
-- [ ] Set up a CI/CD build pipeline (e.g., GitHub Actions) for automated builds and tests.
-- [ ] Create deployment scripts, including Docker for containerization.
-- [ ] Configure Nginx for production serving with caching, compression, and HTTPS.
-- [ ] Document the full deployment process, including environment variable setup.
+- [x] Write unit tests: Go tests for WASM logic, Jest/Vitest for React components.
+- [x] Perform end-to-end integration testing with Cypress or Playwright.
+- [x] Set up a CI/CD build pipeline (e.g., GitHub Actions) for automated builds and tests.
+- [x] Create deployment scripts, including Docker for containerization.
+- [x] Configure Nginx for production serving with caching, compression, and HTTPS.
+- [x] Document the full deployment process, including environment variable setup.
 
 ## Implementation Details
 
@@ -414,6 +414,26 @@ COPY dist /usr/share/nginx/html
 COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
+```
+
+## Deployment
+
+For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
+
+### Quick Start
+
+```bash
+# Setup development environment
+./scripts/setup-dev.sh
+
+# Run tests
+./scripts/deploy.sh test
+
+# Deploy locally
+./scripts/deploy.sh deploy-local
+
+# Deploy to production
+SERVER=user@server.com ./scripts/deploy.sh deploy-remote
 ```
 
 ## Security Considerations

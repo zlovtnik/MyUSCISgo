@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # Main application service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      # Mount SSL certificates (uncomment and create certs directory for HTTPS)
+      # - ./certs:/etc/ssl/certs:ro
+      # - ./certs:/etc/ssl/private:ro
+      # Mount nginx logs for debugging
+      - nginx_logs:/var/log/nginx
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - app_network
+
+  # Optional: Reverse proxy with SSL termination
+  # proxy:
+  #   image: nginx:alpine
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx/proxy.conf:/etc/nginx/conf.d/default.conf:ro
+  #     - ./certs:/etc/ssl/certs:ro
+  #     - ./certs:/etc/ssl/private:ro
+  #   depends_on:
+  #     - app
+  #   restart: unless-stopped
+  #   networks:
+  #     - app_network
+
+  # Optional: Redis for caching (if needed for session management)
+  # redis:
+  #   image: redis:alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   restart: unless-stopped
+  #   networks:
+  #     - app_network
+
+  # Optional: Monitoring with Prometheus
+  # prometheus:
+  #   image: prom/prometheus
+  #   ports:
+  #     - "9090:9090"
+  #   volumes:
+  #     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #   restart: unless-stopped
+  #   networks:
+  #     - app_network
+
+volumes:
+  nginx_logs:
+  # redis_data:
+  # certs:
+
+networks:
+  app_network:
+    driver: bridge
