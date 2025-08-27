@@ -12,21 +12,28 @@ import (
 
 	"MyUSCISgo/pkg/logging"
 	"MyUSCISgo/pkg/processing"
+	"MyUSCISgo/pkg/ratelimit"
 	"MyUSCISgo/pkg/types"
 	"MyUSCISgo/pkg/validation"
 )
 
+const (
+	ProcessingTimeoutMsg = "Processing timeout"
+)
+
 // Handler handles WASM function calls from JavaScript
 type Handler struct {
-	processor *processing.Processor
-	logger    *logging.Logger
+	processor   *processing.Processor
+	logger      *logging.Logger
+	rateLimiter *ratelimit.RateLimiter
 }
 
 // NewHandler creates a new WASM handler
 func NewHandler() *Handler {
 	return &Handler{
-		processor: processing.NewProcessor(),
-		logger:    logging.NewLogger(logging.LogLevelInfo),
+		processor:   processing.NewProcessor(),
+		logger:      logging.NewLogger(logging.LogLevelInfo),
+		rateLimiter: ratelimit.NewRateLimiter(10, time.Minute), // 10 requests per minute
 	}
 }
 
@@ -68,6 +75,15 @@ func (h *Handler) ProcessCredentialsAsync(this js.Value, args []js.Value) any {
 			"environment": creds.Environment,
 		}))
 		return h.createErrorResponse(err.Error())
+	}
+
+	// Rate limiting check
+	clientIP := "unknown" // In a real implementation, you'd get this from the request context
+	if !h.rateLimiter.Allow(clientIP) {
+		h.logger.Warn("Rate limit exceeded", map[string]interface{}{
+			"clientIP": clientIP,
+		})
+		return h.createErrorResponse("Rate limit exceeded. Please try again later.")
 	}
 
 	h.logger.Info("Credentials validated successfully", map[string]interface{}{
@@ -118,13 +134,13 @@ func (h *Handler) ProcessCredentialsAsync(this js.Value, args []js.Value) any {
 			h.sendProgressUpdate("processing_timeout", map[string]interface{}{
 				"clientId":    creds.ClientID,
 				"environment": creds.Environment,
-				"error":       "Processing timeout",
+				"error":       ProcessingTimeoutMsg,
 			})
 			h.logger.Error("Processing timeout", err, map[string]interface{}{
 				"clientId":    creds.ClientID,
 				"environment": creds.Environment,
 			})
-			reject.Invoke(h.createErrorResponse("Processing timeout"))
+			reject.Invoke(h.createErrorResponse(ProcessingTimeoutMsg))
 		}
 	})
 }

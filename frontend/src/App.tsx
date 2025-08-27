@@ -6,8 +6,9 @@ import { useWasm } from './hooks/useWasm';
 import { CredentialForm } from './components/forms/CredentialForm';
 import { ResultDisplay } from './components/ResultDisplay';
 import { LoadingSpinner } from './components/LoadingSpinner';
+import { ErrorBoundary } from './components/error/ErrorBoundary';
 
-function App() {
+function AppContent() {
   const [result, setResult] = useState<ProcessingResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const { isLoaded, error: wasmError, processCredentials, realtimeUpdates, clearRealtimeUpdates } = useWasm();
@@ -201,6 +202,14 @@ function App() {
         theme="light"
       />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
   );
 }
 
