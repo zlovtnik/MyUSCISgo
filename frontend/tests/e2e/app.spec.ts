@@ -100,13 +100,21 @@ test.describe('WASM App E2E Tests', () => {
     await page.selectOption('select[id="environment-select"]', 'development');
     await page.click('button[type="submit"]');
 
-    // Check for error message or that the form handles it gracefully
-    // The app should either show an error or handle it without crashing
-    await page.waitForTimeout(2000); // Wait a bit for processing
+    // Wait for either an error message or the button to return to enabled state
+    // The app should either show an error toast or handle it gracefully
+    try {
+      // First, try to wait for an error toast to appear
+      await page.waitForSelector('[role="alert"]', { timeout: 5000 });
+      // If we get here, an error message appeared
+    } catch {
+      // If no error message appears, wait for the button to return to enabled state
+      await page.waitForSelector('button[type="submit"]:not([disabled])', { timeout: 10000 });
+      await expect(page.locator('button[type="submit"]')).toHaveText('Submit Credentials');
+    }
 
-    // Check that we're not stuck in a loading state indefinitely
-    const buttonText = await page.locator('button[type="submit"]').textContent();
-    expect(buttonText).not.toContain('Processing...');
+    // Verify we're not stuck in a loading state
+    await expect(page.locator('button[type="submit"]')).toBeEnabled();
+    await expect(page.locator('button[type="submit"]')).not.toHaveText('Processing...');
   });
 
   test('should clear sensitive data after submission', async ({ page }) => {

@@ -109,6 +109,11 @@ push_docker() {
         exit 1
     fi
 
+    if [ -z "$DOCKER_USER" ]; then
+        log_error "DOCKER_USER environment variable is not set"
+        exit 1
+    fi
+
     echo "$DOCKER_TOKEN" | docker login $DOCKER_REGISTRY -u $DOCKER_USER --password-stdin
     docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}:${DOCKER_TAG}
     docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}:latest
@@ -143,13 +148,38 @@ deploy_remote() {
     push_docker
 
     # Deploy using docker-compose on remote server
-    ssh $server << EOF
-        cd /opt/${APP_NAME}
-        docker-compose pull
-        docker-compose down
-        docker-compose up -d
-        docker-compose logs -f --tail=50
-EOF
+    log_info "Executing remote deployment commands..."
+
+    # Create a temporary script for remote execution
+    cat << 'REMOTE_SCRIPT_EOF' | ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 "$server" bash -s
+#!/bin/bash
+set -euo pipefail
+
+# Trap to ensure cleanup on error
+trap 'echo "Remote deployment failed" >&2; exit 1' ERR
+
+cd "/opt/${APP_NAME}"
+
+echo "Pulling latest Docker images..."
+docker-compose pull
+
+echo "Stopping existing containers..."
+docker-compose down
+
+echo "Starting updated containers..."
+docker-compose up -d
+
+echo "Showing recent logs..."
+docker-compose logs -f --tail=50
+
+echo "Remote deployment completed successfully"
+REMOTE_SCRIPT_EOF
+
+    # Check SSH exit status
+    if [ $? -ne 0 ]; then
+        log_error "SSH deployment failed with exit code $?"
+        exit 1
+    fi
 
     log_info "Remote deployment completed."
 }

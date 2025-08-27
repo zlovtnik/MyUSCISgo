@@ -66,8 +66,29 @@ install_node() {
         log_step "Installing Node.js 18+..."
 
         if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-            # Linux installation
-            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+            # Linux installation - download script securely
+            local temp_script="/tmp/nodesource-setup.sh"
+            log_info "Downloading Node.js setup script..."
+
+            if ! curl -fSL -o "$temp_script" https://deb.nodesource.com/setup_18.x; then
+                log_error "Failed to download Node.js setup script"
+                exit 1
+            fi
+
+            if [ ! -s "$temp_script" ]; then
+                log_error "Downloaded Node.js setup script is empty"
+                rm -f "$temp_script"
+                exit 1
+            fi
+
+            log_info "Running Node.js setup script..."
+            if ! sudo -E bash "$temp_script"; then
+                log_error "Node.js setup script failed"
+                rm -f "$temp_script"
+                exit 1
+            fi
+
+            rm -f "$temp_script"
             sudo apt-get install -y nodejs
         elif [[ "$OSTYPE" == "darwin"* ]]; then
             # macOS installation
@@ -89,11 +110,30 @@ install_docker() {
         log_step "Installing Docker..."
 
         if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-            # Linux installation
-            curl -fsSL https://get.docker.com -o get-docker.sh
-            sudo sh get-docker.sh
+            # Linux installation - download script securely
+            local temp_script="/tmp/get-docker.sh"
+            log_info "Downloading Docker installation script..."
+
+            if ! curl -fSL -o "$temp_script" https://get.docker.com; then
+                log_error "Failed to download Docker installation script"
+                exit 1
+            fi
+
+            if [ ! -s "$temp_script" ]; then
+                log_error "Downloaded Docker installation script is empty"
+                rm -f "$temp_script"
+                exit 1
+            fi
+
+            log_info "Running Docker installation script..."
+            if ! sudo bash "$temp_script"; then
+                log_error "Docker installation script failed"
+                rm -f "$temp_script"
+                exit 1
+            fi
+
+            rm -f "$temp_script"
             sudo usermod -aG docker $USER
-            rm get-docker.sh
         elif [[ "$OSTYPE" == "darwin"* ]]; then
             # macOS installation
             brew install --cask docker
