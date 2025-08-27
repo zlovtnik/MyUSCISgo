@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This enhanced project builds a robust WebAssembly (WASM) application using Go as the backend logic compiled to WASM and React for the interactive frontend. The app securely passes three key variables (client ID, client secret, and environment) from the React interface to the Go WASM module for processing. Enhancements include improved security, better error handling, asynchronous operations, performance optimizations, and integration with Nginx for efficient static file serving in production. This setup ensures scalability, security, and ease of deployment.
+This project delivers a robust WebAssembly (WASM) application with Go handling backend logic compiled to WASM and React providing the interactive frontend. The app securely transmits three essential variables (client ID, client secret, and environment) from the React UI into the Go WASM module for processing. Enhancements focus on improved security, advanced error handling, asynchronous processing, and optimized performance. The integration with Nginx ensures efficient serving of static files in production, resulting in a scalable, secure, and easy-to-deploy solution.
 
 ## Architecture
 
