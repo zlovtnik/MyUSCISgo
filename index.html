@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go WASM with React (Enhanced)</title>
+    <script src="wasm_exec.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .App {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .App-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .App-header h1 {
+            color: white;
+            font-size: 2.5rem;
+            margin: 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .form-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        input[type="password"] {
+            font-family: 'Courier New', monospace;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            width: 100%;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid #fcc;
+            margin-top: 20px;
+        }
+
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .result h2 {
+            margin-top: 0;
+            color: #333;
+            font-size: 18px;
+        }
+
+        .result pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            margin: 0;
+        }
+
+        .status {
+            text-align: center;
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+
+        .status.loading {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #bbdefb;
+        }
+
+        .status.success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+
+        @media (max-width: 600px) {
+            .App {
+                padding: 10px;
+            }
+
+            .App-header h1 {
+                font-size: 2rem;
+            }
+
+            .form-container {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="App">
+        <header class="App-header">
+            <h1>Go WASM with React (Enhanced)</h1>
+        </header>
+        <div class="form-container">
+            <div id="wasm-status" class="status loading">Loading WASM module...</div>
+            <div id="content"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import React from 'https://esm.sh/react@18';
+        import ReactDOM from 'https://esm.sh/react-dom@18';
+
+        // Make React available globally for the WASM module
+        window.React = React;
+
+        // Load WASM module
+        const loadWasm = async () => {
+            try {
+                const go = new Go();
+                const result = await WebAssembly.instantiateStreaming(
+                    fetch('main.wasm'),
+                    go.importObject
+                );
+                go.run(result.instance);
+
+                // Update status
+                document.getElementById('wasm-status').className = 'status success';
+                document.getElementById('wasm-status').textContent = 'WASM module loaded successfully!';
+
+                // Render React app
+                renderApp();
+            } catch (error) {
+                console.error('WASM load failed:', error);
+                document.getElementById('wasm-status').className = 'status error';
+                document.getElementById('wasm-status').textContent = 'Failed to load WASM module: ' + error.message;
+            }
+        };
+
+        const renderApp = () => {
+            const App = () => {
+                const [clientId, setClientId] = React.useState('');
+                const [clientSecret, setClientSecret] = React.useState('');
+                const [environment, setEnvironment] = React.useState('development');
+                const [result, setResult] = React.useState('');
+                const [loading, setLoading] = React.useState(false);
+                const [error, setError] = React.useState('');
+
+                const handleSubmit = async (e) => {
+                    e.preventDefault();
+                    setLoading(true);
+                    setError('');
+                    setResult('');
+
+                    try {
+                        const credentials = { clientId, clientSecret, environment };
+                        const response = window.goProcessCredentials(JSON.stringify(credentials));
+
+                        if (response.error) {
+                            setError(`Error: ${response.error}`);
+                        } else {
+                            setResult(JSON.stringify(response.result, null, 2));
+                        }
+                        // Clear sensitive fields
+                        setClientSecret('');
+                    } catch (err) {
+                        setError(`Unexpected error: ${err.message}`);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+
+                return React.createElement('div', null, [
+                    React.createElement('form', { key: 'form', onSubmit: handleSubmit }, [
+                        React.createElement('div', { key: 'clientId-group', className: 'form-group' }, [
+                            React.createElement('label', { key: 'clientId-label', htmlFor: 'clientId' }, 'Client ID:'),
+                            React.createElement('input', {
+                                key: 'clientId-input',
+                                type: 'text',
+                                id: 'clientId',
+                                value: clientId,
+                                onChange: (e) => setClientId(e.target.value.trim()),
+                                required: true,
+                                pattern: '^[a-zA-Z0-9-]+$',
+                                title: 'Alphanumeric with hyphens only'
+                            })
+                        ]),
+                        React.createElement('div', { key: 'clientSecret-group', className: 'form-group' }, [
+                            React.createElement('label', { key: 'clientSecret-label', htmlFor: 'clientSecret' }, 'Client Secret:'),
+                            React.createElement('input', {
+                                key: 'clientSecret-input',
+                                type: 'password',
+                                id: 'clientSecret',
+                                value: clientSecret,
+                                onChange: (e) => setClientSecret(e.target.value),
+                                required: true,
+                                minLength: 8
+                            })
+                        ]),
+                        React.createElement('div', { key: 'environment-group', className: 'form-group' }, [
+                            React.createElement('label', { key: 'environment-label', htmlFor: 'environment' }, 'Environment:'),
+                            React.createElement('select', {
+                                key: 'environment-select',
+                                id: 'environment',
+                                value: environment,
+                                onChange: (e) => setEnvironment(e.target.value)
+                            }, [
+                                React.createElement('option', { key: 'dev', value: 'development' }, 'Development'),
+                                React.createElement('option', { key: 'staging', value: 'staging' }, 'Staging'),
+                                React.createElement('option', { key: 'prod', value: 'production' }, 'Production')
+                            ])
+                        ]),
+                        React.createElement('button', {
+                            key: 'submit-btn',
+                            type: 'submit',
+                            disabled: loading
+                        }, loading ? 'Processing...' : 'Submit')
+                    ]),
+                    error && React.createElement('div', { key: 'error', className: 'error' }, error),
+                    result && React.createElement('div', { key: 'result', className: 'result' }, [
+                        React.createElement('h2', { key: 'result-title' }, 'Result:'),
+                        React.createElement('pre', { key: 'result-content' }, result)
+                    ])
+                ]);
+            };
+
+            ReactDOM.render(React.createElement(App), document.getElementById('content'));
+        };
+
+        // Load WASM when page loads
+        loadWasm();
+    </script>
+</body>
+</html></content>
+<parameter name="filePath">/Users/rcs/git/MyUSCISgo/index.html

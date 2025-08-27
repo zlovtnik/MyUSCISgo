@@ -1,0 +1,42 @@
+//go:build !js || !wasm
+
+package main
+
+import (
+	"MyUSCISgo/internal/wasm"
+	"fmt"
+)
+
+func runTests() {
+	// Test the non-WASM version of the handler
+	handler := wasm.NewHandler()
+
+	// Test data
+	testInput := `{
+		"clientId": "test-client-123",
+		"clientSecret": "SecurePass7!@#Word",
+		"environment": "development"
+	}`
+
+	fmt.Println("Testing Go WASM Handler...")
+	fmt.Printf("Input: %s\n", testInput)
+
+	// Test the processing
+	result, err := handler.ProcessCredentialsAsync(testInput)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Output: %s\n", result)
+
+	// Test health check
+	health := handler.HealthCheck()
+	fmt.Printf("Health Check: %s\n", health)
+
+	fmt.Println("All tests completed successfully!")
+}
+
+func main() {
+	runTests()
+}
