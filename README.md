@@ -2,7 +2,27 @@
 
 ## Project Overview
 
-This project delivers a robust WebAssembly (WASM) application with Go handling backend logic compiled to WASM and React providing the interactive frontend. The app securely transmits three essential variables (client ID, client secret, and environment) from the React UI into the Go WASM module for processing. Enhancements focus on improved security, advanced error handling, asynchronous processing, and optimized performance. The integration with Nginx ensures efficient serving of static files in production, resulting in a scalable, secure, and easy-to-deploy solution.
+This project delivers a robust WebAssembly (WASM) application with Go handling backend logic compiled to WASM and React p    WASM_WORKER --> WASM_HANDLER
+    WASM_HANDLER --> MAIN
+
+    WASM_HANDLER --> PROCESSOR_PKG
+    WASM_HANDLER --> VALIDATION_PKG
+    WASM_HANDLER --> LOGGING_PKG
+    WASM_HANDLER --> RATE_LIMIT_PKG
+
+    PROCESSOR_PKG --> TYPES_PKG
+    PROCESSOR_PKG --> SECURITY_PKG
+    VALIDATION_PKG --> TYPES_PKG
+    LOGGING_PKG --> TRACKER_PKG
+    RATE_LIMIT_PKG --> TRACKER_PKG
+
+    CREDENTIAL_FORM --> WASM_HOOK
+    ENV_SELECTOR --> WASM_HOOK
+    RESULT_DISPLAY --> WASM_HOOK
+
+    APP --> TOAST_SYSTEM
+    CREDENTIAL_FORM --> FORM_VALIDATION
+    RESULT_DISPLAY --> JSON_VIEWERtive frontend. The app securely transmits three essential variables (client ID, client secret, and environment) from the React UI into the Go WASM module for processing. Enhancements focus on improved security, advanced error handling, asynchronous processing, and optimized performance. The integration with Nginx ensures efficient serving of static files in production, resulting in a scalable, secure, and easy-to-deploy solution.
 
 ## Architecture
 
@@ -117,21 +137,41 @@ graph TB
 ```mermaid
 graph TD
     subgraph "React Frontend Architecture"
-        APP[App.tsx<br/>Main Component]
-        FORM[CredentialForm<br/>Input Validation]
-        RESULTS[ResultsDisplay<br/>JSON Viewer]
-        LOADER[LoadingSpinner<br/>Async States]
-        ERROR[ErrorBoundary<br/>Error Handling]
-        WORKER_HOOK[useWasmWorker<br/>WASM Integration]
+        APP[App.tsx<br/>Main Application]
+        CREDENTIAL_FORM[CredentialForm<br/>forms/CredentialForm.tsx<br/>Input Validation]
+        ENV_SELECTOR[EnvironmentSelector<br/>forms/EnvironmentSelector.tsx<br/>Environment Dropdown]
+        RESULT_DISPLAY[ResultDisplay<br/>ResultDisplay.tsx<br/>JSON Viewer]
+        LOADING_SPINNER[LoadingSpinner<br/>LoadingSpinner.tsx<br/>Async States]
+        ERROR_BOUNDARY[ErrorBoundary<br/>error/ErrorBoundary.tsx<br/>Error Handling]
+        WASM_HOOK[useWasm<br/>hooks/useWasm.ts<br/>WASM Integration & Web Worker]
     end
 
     subgraph "Go WASM Module Architecture"
-        MAIN[main.go<br/>Entry Point]
-        CREDENTIALS[Credentials Struct<br/>Data Model]
-        PROCESSOR[processCredentials<br/>Core Logic]
-        VALIDATOR[Input Validation<br/>Security Layer]
-        ENV_HANDLER[Environment Handler<br/>Config Logic]
-        ERROR_HANDLER[Error Handler<br/>Panic Recovery]
+        MAIN[main.go<br/>Entry Point<br/>WASM Initialization]
+        WASM_HANDLER[Handler<br/>internal/wasm/handler.go<br/>Request Processing<br/>Async Operations]
+        HANDLER_MOCK[Handler Mock<br/>internal/wasm/handler_mock.go<br/>Testing Support]
+
+        PROCESSOR_PKG[Processing Package<br/>pkg/processing/<br/>Business Logic<br/>Environment Config]
+        VALIDATION_PKG[Validation Package<br/>pkg/validation/<br/>Input Validation<br/>Security Checks]
+        LOGGING_PKG[Logging Package<br/>pkg/logging/<br/>Structured Logging<br/>Error Tracking]
+        RATE_LIMIT_PKG[Rate Limiting<br/>pkg/ratelimit/<br/>Request Throttling<br/>DDoS Protection]
+        SECURITY_PKG[Security Package<br/>pkg/security/<br/>Encryption<br/>Credential Protection]
+        TRACKER_PKG[Tracker Package<br/>pkg/tracker/<br/>Usage Analytics<br/>Performance Metrics]
+        TYPES_PKG[Types Package<br/>pkg/types/<br/>Data Models<br/>Type Definitions]
+    end
+
+    subgraph "Web Worker Architecture"
+        WASM_WORKER[wasm-worker.js<br/>Web Worker<br/>/frontend/public/wasm-worker.js]
+        WORKER_COMM[Worker Communication<br/>Message Passing<br/>Request/Response Pattern]
+        REQUEST_MANAGER[Request Manager<br/>Request ID Tracking<br/>Promise Resolution]
+        CACHE_SYSTEM[Cache System<br/>Result Caching<br/>TTL Management<br/>FIFO Eviction]
+        REALTIME_UPDATES[Realtime Updates<br/>Live Status Updates<br/>Background Processing]
+    end
+
+    subgraph "UI Components & Libraries"
+        TOAST_SYSTEM[Toast Notifications<br/>react-toastify<br/>User Feedback]
+        FORM_VALIDATION[Form Validation<br/>HTML5 + Custom<br/>Input Sanitization]
+        JSON_VIEWER[JSON Viewer<br/>Syntax Highlighting<br/>Pretty Printing]
     end
 
     subgraph "Build System Architecture"
@@ -143,15 +183,27 @@ graph TD
     end
 
     %% Component Relationships
-    APP --> FORM
-    APP --> RESULTS
-    APP --> LOADER
-    APP --> ERROR
-    APP --> WORKER_HOOK
+    APP --> CREDENTIAL_FORM
+    APP --> ENV_SELECTOR
+    APP --> RESULT_DISPLAY
+    APP --> LOADING_SPINNER
+    APP --> ERROR_BOUNDARY
+    APP --> WASM_HOOK
 
-    WORKER_HOOK --> MAIN
-    FORM --> WORKER_HOOK
-    RESULTS --> WORKER_HOOK
+    WASM_HOOK --> WASM_WORKER
+    WASM_WORKER --> WORKER_COMM
+    WORKER_COMM --> REQUEST_MANAGER
+    WORKER_COMM --> CACHE_SYSTEM
+    WORKER_COMM --> REALTIME_UPDATES
+
+    WASM_WORKER --> MAIN
+    CREDENTIAL_FORM --> WASM_HOOK
+    ENV_SELECTOR --> WASM_HOOK
+    RESULT_DISPLAY --> WASM_HOOK
+
+    APP --> TOAST_SYSTEM
+    CREDENTIAL_FORM --> FORM_VALIDATION
+    RESULT_DISPLAY --> JSON_VIEWER
 
     MAIN --> CREDENTIALS
     MAIN --> PROCESSOR
@@ -166,7 +218,7 @@ graph TD
 
     GO_COMPILER --> MAIN
     VITE_BUILDER --> APP
-    ASSET_MANAGER --> MAIN
+    ASSET_MANAGER --> WASM_WORKER
     DOCKER_BUILDER --> BUILD_SCRIPT
 ```
 
@@ -176,44 +228,78 @@ graph TD
 sequenceDiagram
     participant U as User
     participant R as React App
+    participant H as useWasm Hook
     participant W as Web Worker
     participant G as Go WASM
     participant N as Nginx
-    participant D as Docker
 
-    Note over U,D: Application Startup
+    Note over U,N: Application Startup
     U->>R: Access Application
     R->>N: Request Static Files
-    N-->>R: Serve HTML/CSS/JS
-    R->>W: Initialize WASM Worker
+    N-->>R: Serve HTML/CSS/JS/wasm-worker.js
+    R->>H: Initialize useWasm Hook
+    H->>W: Create Web Worker
     W->>N: Fetch main.wasm
     N-->>W: Serve WASM Binary
     W->>G: Instantiate WASM Module
     G-->>W: Module Ready
+    W-->>H: Send 'initialized' Message
+    H-->>R: Set isLoaded = true
 
-    Note over U,D: User Interaction
+    Note over U,N: User Interaction Flow
     U->>R: Submit Credentials
     R->>R: Validate Form Data
-    R->>W: Send Credentials to Worker
-    W->>G: Call goProcessCredentials()
-    G->>G: Validate & Process Data
-    G-->>W: Return Results
-    W-->>R: Send Results to Main Thread
-    R-->>U: Display Results
+    R->>H: Call processCredentials()
+    H->>H: Generate Request ID
+    H->>W: Send Message with Request ID
+    W->>W: Check Cache for Existing Result
+    alt Cache Hit
+        W->>H: Return Cached Result
+    else Cache Miss
+        W->>G: Call goProcessCredentials()
+        G->>WASM_HANDLER: Route to Handler
+        WASM_HANDLER->>RATE_LIMIT_PKG: Check Rate Limits
+        WASM_HANDLER->>VALIDATION_PKG: Validate Input
+        WASM_HANDLER->>LOGGING_PKG: Log Request
+        WASM_HANDLER->>PROCESSOR_PKG: Process Credentials
+        PROCESSOR_PKG->>TYPES_PKG: Get Type Definitions
+        PROCESSOR_PKG->>SECURITY_PKG: Apply Security Measures
+        PROCESSOR_PKG->>TRACKER_PKG: Track Usage Metrics
+        PROCESSOR_PKG-->>WASM_HANDLER: Return Processed Result
+        WASM_HANDLER->>LOGGING_PKG: Log Response
+        G-->>W: Return Results
+        W->>W: Cache Result for Future Use
+    end
+    W-->>H: Send 'result' Message with Request ID
+    H->>H: Match Request ID & Resolve Promise
+    H-->>R: Return Results
+    R-->>U: Display Results & Show Toast
 
-    Note over U,D: Error Handling
+    Note over U,N: Realtime Updates
+    G->>W: Send Realtime Update
+    W-->>H: Forward Realtime Update
+    H->>H: Update realtimeUpdates State
+    H-->>R: Trigger Re-render with Updates
+    R-->>U: Show Live Processing Status
+
+    Note over U,N: Error Handling
     U->>R: Submit Invalid Data
-    R->>W: Send Invalid Credentials
+    R->>H: Call processCredentials()
+    H->>W: Send Message with Request ID
     W->>G: Call goProcessCredentials()
     G->>G: Detect Validation Error
     G-->>W: Return Error Response
-    W-->>R: Forward Error
-    R-->>U: Show Error Message
+    W-->>H: Send 'result' Message with Error
+    H->>H: Match Request ID & Reject Promise
+    H-->>R: Throw Error
+    R-->>U: Show Error Toast
 
-    Note over U,D: Deployment
-    D->>N: Container Startup
-    N->>D: Health Check
-    D-->>N: Ready Status
+    Note over U,N: Health Checks
+    H->>W: Send Health Check Request
+    W->>G: Execute Health Check
+    G-->>W: Return Health Status
+    W-->>H: Send Health Result
+    H->>H: Update Health Status
 ```
 
 ## Requirements
@@ -230,13 +316,20 @@ sequenceDiagram
 
 ### Technical Requirements
 
-- Go 1.21+ (with WebAssembly support for browser execution).
-- React 18+ for the frontend, with hooks for state management.
+- Go 1.21+ (with WebAssembly support for browser execution and modular architecture).
+- React 18+ for the frontend, with hooks for state management and TypeScript for type safety.
 - Vite for bundling (preferred over Webpack for faster development and builds).
-- TypeScript for type safety in both Go and React code.
-- Web Workers for non-blocking WASM execution.
-- Docker for containerization and deployment.
-- Nginx for serving static files (React build, WASM binary, and assets) in production for improved performance, caching, and security.
+- Web Workers for non-blocking WASM execution with caching and request management.
+- Docker for containerization and deployment with multi-stage builds.
+- Nginx for serving static files with compression, caching, and security headers.
+- Modular Go architecture with separate packages for:
+  - Processing (business logic and environment configuration)
+  - Validation (input validation and security checks)
+  - Logging (structured logging and error tracking)
+  - Rate limiting (request throttling and DDoS protection)
+  - Security (encryption and credential protection)
+  - Tracking (usage analytics and performance metrics)
+  - Types (data models and type definitions)
 
 ## Tasks
 
