@@ -2,10 +2,23 @@ package validation
 
 import (
 	"errors"
+	"html"
 	"regexp"
 	"strings"
 
 	"MyUSCISgo/pkg/types"
+)
+
+var (
+	// Precompiled regexes for input sanitization
+	rxJSProtocol = regexp.MustCompile(`(?i)javascript\s*:`)
+	rxOnAttr     = regexp.MustCompile(`(?i)\son\w+\s*=`)
+	rxScriptTag  = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
+	rxCtrlChars  = regexp.MustCompile(`[\x00-\x1F\x7F-\x9F]`)
+
+	// Precompiled regexes for client secret validation
+	rxHasLetter = regexp.MustCompile(`[a-zA-Z]`)
+	rxHasNumber = regexp.MustCompile(`[0-9]`)
 )
 
 // ValidationError represents a validation error
@@ -46,15 +59,13 @@ func ValidateCredentials(creds *types.Credentials) error {
 
 // ValidateClientID validates the client ID format
 func ValidateClientID(clientID string) error {
-	if strings.TrimSpace(clientID) == "" {
+	trimmedID := strings.TrimSpace(clientID)
+	if trimmedID == "" {
 		return ValidationError{Field: "clientId", Message: "client ID cannot be empty"}
 	}
 
-	// Sanitize input first
-	clientID = SanitizeInput(clientID)
-
-	// Client ID should be alphanumeric with hyphens and underscores
-	matched, err := regexp.MatchString(`^[a-zA-Z0-9\-_]+$`, clientID)
+	// Validate format rules on raw trimmed input (no sanitization)
+	matched, err := regexp.MatchString(`^[a-zA-Z0-9\-_]+$`, trimmedID)
 	if err != nil {
 		return ValidationError{Field: "clientId", Message: "invalid client ID format"}
 	}
@@ -62,7 +73,7 @@ func ValidateClientID(clientID string) error {
 		return ValidationError{Field: "clientId", Message: "client ID must contain only alphanumeric characters, hyphens, and underscores"}
 	}
 
-	if len(clientID) < 3 || len(clientID) > 100 {
+	if len(trimmedID) < 3 || len(trimmedID) > 100 {
 		return ValidationError{Field: "clientId", Message: "client ID must be between 3 and 100 characters"}
 	}
 
@@ -75,9 +86,7 @@ func ValidateClientSecret(clientSecret string) error {
 		return ValidationError{Field: "clientSecret", Message: "client secret cannot be empty"}
 	}
 
-	// Sanitize input first
-	clientSecret = SanitizeInput(clientSecret)
-
+	// Validate length constraints on raw input (before any sanitization)
 	if len(clientSecret) < 8 {
 		return ValidationError{Field: "clientSecret", Message: "client secret must be at least 8 characters long"}
 	}
@@ -86,9 +95,9 @@ func ValidateClientSecret(clientSecret string) error {
 		return ValidationError{Field: "clientSecret", Message: "client secret must be less than 255 characters"}
 	}
 
-	// Check for basic complexity (at least one letter and one number)
-	hasLetter := regexp.MustCompile(`[a-zA-Z]`).MatchString(clientSecret)
-	hasNumber := regexp.MustCompile(`[0-9]`).MatchString(clientSecret)
+	// Check for basic complexity on raw input (at least one letter and one number)
+	hasLetter := rxHasLetter.MatchString(clientSecret)
+	hasNumber := rxHasNumber.MatchString(clientSecret)
 
 	if !hasLetter || !hasNumber {
 		return ValidationError{Field: "clientSecret", Message: "client secret must contain at least one letter and one number"}
@@ -108,20 +117,19 @@ func ValidateEnvironment(env string) error {
 
 // SanitizeInput sanitizes user input to prevent injection attacks
 func SanitizeInput(input string) string {
-	// Remove any potential script tags or HTML
-	input = strings.ReplaceAll(input, "<", "&lt;")
-	input = strings.ReplaceAll(input, ">", "&gt;")
-	input = strings.ReplaceAll(input, "\"", "&quot;")
+	// HTML escape &, <, >, and " using the standard library
+	input = html.EscapeString(input)
+
+	// Handle single quotes separately (html.EscapeString doesn't escape them)
 	input = strings.ReplaceAll(input, "'", "&#x27;")
-	input = strings.ReplaceAll(input, "&", "&amp;")
 
 	// Remove potential JavaScript injection patterns
-	input = regexp.MustCompile(`javascript:`).ReplaceAllString(input, "")
-	input = regexp.MustCompile(`on\w+\s*=`).ReplaceAllString(input, "")
-	input = regexp.MustCompile(`<script[^>]*>.*?</script>`).ReplaceAllString(input, "")
+	input = rxJSProtocol.ReplaceAllString(input, "")
+	input = rxOnAttr.ReplaceAllString(input, "")
+	input = rxScriptTag.ReplaceAllString(input, "")
 
 	// Remove null bytes and control characters
-	input = regexp.MustCompile(`[\x00-\x1F\x7F-\x9F]`).ReplaceAllString(input, "")
+	input = rxCtrlChars.ReplaceAllString(input, "")
 
 	// Trim whitespace
 	return strings.TrimSpace(input)

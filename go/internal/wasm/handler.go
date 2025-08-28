@@ -53,7 +53,7 @@ func (h *Handler) ProcessCredentialsAsync(this js.Value, args []js.Value) any {
 	if len(args) != 1 {
 		err := fmt.Errorf("invalid number of arguments: expected 1, got %d", len(args))
 		h.logger.Error("Invalid arguments", err)
-		return h.createErrorResponse(err.Error())
+		return js.Global().Get("Promise").Call("reject", h.createErrorResponse(err.Error()))
 	}
 
 	// Parse JSON input
@@ -65,7 +65,8 @@ func (h *Handler) ProcessCredentialsAsync(this js.Value, args []js.Value) any {
 	var creds types.Credentials
 	if err := json.Unmarshal([]byte(credJSON), &creds); err != nil {
 		h.logger.Error("Failed to parse credentials JSON", err)
-		return h.createErrorResponse(fmt.Sprintf("Failed to parse credentials: %v", err))
+		return js.Global().Get("Promise").Call("reject",
+			h.createErrorResponse(fmt.Sprintf("Failed to parse credentials: %v", err)))
 	}
 
 	// Validate credentials
@@ -74,14 +75,16 @@ func (h *Handler) ProcessCredentialsAsync(this js.Value, args []js.Value) any {
 			"clientId":    creds.ClientID,
 			"environment": creds.Environment,
 		}))
-		return h.createErrorResponse(err.Error())
+		return js.Global().Get("Promise").Call("reject", h.createErrorResponse(err.Error()))
 	}
 
-	// Rate limiting check
-	clientIP := "unknown" // In a real implementation, you'd get this from the request context
-	if !h.rateLimiter.Allow(clientIP) {
+	// Rate limiting check - use client identifier derived from validated credentials
+	rateLimitKey := fmt.Sprintf("%s:%s", creds.Environment, creds.ClientID)
+	if !h.rateLimiter.Allow(rateLimitKey) {
 		h.logger.Warn("Rate limit exceeded", map[string]interface{}{
-			"clientIP": clientIP,
+			"rateLimitKey": rateLimitKey,
+			"clientId":     creds.ClientID,
+			"environment":  creds.Environment,
 		})
 		return h.createErrorResponse("Rate limit exceeded. Please try again later.")
 	}
@@ -262,9 +265,10 @@ func (h *Handler) SendRealtimeUpdate(this js.Value, args []js.Value) any {
 	jsCallback := js.Global().Get("onRealtimeUpdate")
 	if !jsCallback.IsUndefined() && jsCallback.Type() == js.TypeFunction {
 		// Create update object
+		// Ensure data is JSON-serializable
 		update := map[string]interface{}{
 			"type":      messageType,
-			"data":      data,
+			"data":      data.String(), // Convert js.Value to string for JSON marshalling
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
 		}
 

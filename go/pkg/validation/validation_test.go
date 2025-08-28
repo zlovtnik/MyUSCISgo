@@ -262,18 +262,24 @@ func TestSanitizeInput(t *testing.T) {
 		expected string
 	}{
 		{"normal input", "normal input", "normal input"},
-		{"input with script", "<script>alert('xss')</script>", "&amp;lt;script&amp;gt;alert(&amp;#x27;xss&amp;#x27;)&amp;lt;/script&amp;gt;"},
-		{"input with quotes", "\"quoted\" 'single'", "&amp;quot;quoted&amp;quot; &amp;#x27;single&amp;#x27;"},
+		{"input with script", "<script>alert('xss')</script>", "&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;"},
+		{"input with quotes", "\"quoted\" 'single'", "&#34;quoted&#34; &#39;single&#39;"},
 		{"input with whitespace", "  input  ", "input"},
 		{"empty input", "", ""},
 		{"input with newlines", "line1\nline2", "line1line2"},
+		{"mixed case javascript protocol", "javascript:alert('xss')", "alert(&#39;xss&#39;)"},
+		{"JavaScript protocol uppercase", "JavaScript:alert('xss')", "alert(&#39;xss&#39;)"},
+		{"multiline script tag", "<SCRIPT>\nalert('xss');\n</SCRIPT>", "&lt;SCRIPT&gt;alert(&#39;xss&#39;);&lt;/SCRIPT&gt;"},
+		{"multiline script with content", "<script>\n  alert('xss');\n  console.log('test');\n</script>", "&lt;script&gt;  alert(&#39;xss&#39;);  console.log(&#39;test&#39;);&lt;/script&gt;"},
+		{"onClick attribute", "<div onClick=\"alert('xss')\"></div>", "&lt;div&#34;alert(&#39;xss&#39;)&#34;&gt;&lt;/div&gt;"},
+		{"onmouseover attribute", "<img onMouseOver=\"alert('xss')\" />", "&lt;img&#34;alert(&#39;xss&#39;)&#34; /&gt;"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := SanitizeInput(tt.input)
 			if result != tt.expected {
-				t.Errorf("SanitizeInput() = %v, want %v", result, tt.expected)
+				t.Errorf("SanitizeInput() = %q, want %q", result, tt.expected)
 			}
 		})
 	}

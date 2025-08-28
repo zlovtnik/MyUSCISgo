@@ -1,5 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// Declare process for Node.js environment
+declare const process: {
+  env: {
+    CI?: string;
+  };
+};
+
 /**
  * @see https://playwright.dev/docs/test-configuration
  */
@@ -9,12 +16,11 @@ export default defineConfig({
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: true,
-  /* Retry on CI only */
-  retries: 2,
-  /* Opt out of parallel tests on CI. */
-  workers: 1,
+  /* Retry and single worker on CI only */
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  reporter: process.env.CI ? 'github' : 'html',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
@@ -56,6 +62,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:5173',
-    reuseExistingServer: true,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120000,
   },
 });
