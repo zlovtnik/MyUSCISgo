@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { WASMResponse, Credentials } from '../types';
+import type { WASMResponse, Credentials, TokenCertificationResult } from '../types';
 import { toast } from 'react-toastify';
 
 declare global {
@@ -9,6 +9,7 @@ declare global {
       run: (instance: WebAssembly.Instance) => void;
     };
     goProcessCredentials: (credentials: string) => Promise<WASMResponse>;
+    goCertifyToken: (tokenData: string) => Promise<TokenCertificationResult>;
   }
 }
 
@@ -40,6 +41,15 @@ export function useWasm() {
           if (resolveRequest) {
             pendingRequestsRef.current.delete(requestId);
             resolveRequest.resolve(result);
+          }
+          break;
+        }
+
+        case 'certify-result': {
+          const resolveCertify = pendingRequestsRef.current.get(requestId);
+          if (resolveCertify) {
+            pendingRequestsRef.current.delete(requestId);
+            resolveCertify.resolve(result);
           }
           break;
         }
@@ -135,6 +145,32 @@ export function useWasm() {
     });
   }, [isLoaded]);
 
+  const certifyToken = useCallback(async (tokenData: { token: string; caseNumber: string; environment: string }): Promise<TokenCertificationResult> => {
+    if (!isLoaded || !workerRef.current) {
+      throw new Error('WASM module not loaded');
+    }
+
+    const requestId = ++requestIdRef.current;
+
+    return new Promise((resolve, reject) => {
+      pendingRequestsRef.current.set(requestId, { resolve, reject });
+
+      workerRef.current!.postMessage({
+        type: 'certify-token',
+        data: tokenData,
+        requestId
+      });
+
+      // Set a timeout for the request
+      setTimeout(() => {
+        if (pendingRequestsRef.current.has(requestId)) {
+          pendingRequestsRef.current.delete(requestId);
+          reject(new Error('Token certification timeout'));
+        }
+      }, 30000); // 30 second timeout
+    });
+  }, [isLoaded]);
+
   const healthCheck = useCallback(async (): Promise<any> => {
     if (!isLoaded || !workerRef.current) {
       throw new Error('WASM module not loaded');
@@ -194,6 +230,7 @@ export function useWasm() {
     isLoading,
     error,
     processCredentials,
+    certifyToken,
     healthCheck,
     clearCache,
     realtimeUpdates,
