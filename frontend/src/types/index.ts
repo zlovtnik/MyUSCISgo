@@ -57,15 +57,15 @@ export interface FormErrors {
 export interface TokenCertificationResult {
   isValid: boolean;
   caseStatus: string;
-  lastUpdated: string;
+  lastUpdated: string; // ISO 8601 format
   caseDetails: Record<string, string>;
-  verificationId: string;
+  verificationId: string; // Always generated, present on both success and failure
 }
 
 export interface TokenCertificationData {
   readonly token: string;
   readonly caseNumber: string;
-  readonly environment: 'development' | 'production';
+  readonly environment: 'development' | 'production'; // Note: staging not supported for certification flows
 }
 
 export interface TokenCertificationResponse {
