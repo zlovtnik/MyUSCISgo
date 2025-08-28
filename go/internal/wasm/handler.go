@@ -17,24 +17,9 @@ import (
 	"MyUSCISgo/pkg/validation"
 )
 
-	messageType := args[0].String()
-	data := args[1]
-
-	// Properly serialize the JavaScript object using JSON.stringify
-	jsonStringify := js.Global().Get("JSON").Get("stringify")
-	jsonDataStr := jsonStringify.Invoke(data).String()
-	
-	// Store as json.RawMessage to preserve the original JSON structure
-	var rawData json.RawMessage
-	if err := json.Unmarshal([]byte(jsonDataStr), &rawData); err != nil {
-		h.logger.Error("Failed to unmarshal JSON data", err)
-		return h.createErrorResponse("Failed to process data")
-	}
-
-	h.logger.Debug("Sending realtime update", map[string]interface{}{
-		"messageType": messageType,
-		"data":        jsonDataStr, // Use properly serialized JSON string for logging
-	})gTimeoutMsg = "Processing timeout"
+const (
+	// ProcessingTimeoutMsg is the error message for processing timeouts
+	ProcessingTimeoutMsg = "Processing timeout"
 )
 
 // Handler handles WASM function calls from JavaScript
@@ -155,7 +140,7 @@ func (h *Handler) ProcessCredentialsAsync(this js.Value, args []js.Value) any {
 				"environment": creds.Environment,
 				"error":       ProcessingTimeoutMsg,
 			})
-			h.logger.Error("Processing timeout", err, map[string]interface{}{
+			h.logger.Error(ProcessingTimeoutMsg, err, map[string]interface{}{
 				"clientId":    creds.ClientID,
 				"environment": creds.Environment,
 			})
@@ -299,12 +284,12 @@ func (h *Handler) SendRealtimeUpdate(this js.Value, args []js.Value) any {
 		// Handle objects/arrays - use JSON.stringify and unmarshal
 		jsonStringify := js.Global().Get("JSON").Get("stringify")
 		jsonDataStr := jsonStringify.Invoke(data).String()
-		
+
 		// Try to unmarshal into a Go interface{} to preserve structure
 		var unmarshaled interface{}
 		if err := json.Unmarshal([]byte(jsonDataStr), &unmarshaled); err != nil {
 			h.logger.Warn("Failed to unmarshal JSON data, using raw string", map[string]interface{}{
-				"error": err.Error(),
+				"error":      err.Error(),
 				"jsonString": jsonDataStr,
 			})
 			// Fallback: store as string if unmarshaling fails
