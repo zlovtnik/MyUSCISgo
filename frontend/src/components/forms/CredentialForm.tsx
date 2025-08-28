@@ -25,27 +25,19 @@ export function CredentialForm({
 
     switch (field) {
       case 'clientId':
-        if (!value.trim()) {
-          newErrors.clientId = 'Client ID is required';
+        const clientIdError = validateClientId(value);
+        if (clientIdError) {
+          newErrors.clientId = clientIdError;
         } else {
-          const validationError = validateClientId(value);
-          if (validationError) {
-            newErrors.clientId = validationError;
-          } else {
-            delete newErrors.clientId;
-          }
+          delete newErrors.clientId;
         }
         break;
       case 'clientSecret':
-        if (!value.trim()) {
-          newErrors.clientSecret = 'Client Secret is required';
+        const clientSecretError = validateClientSecret(value);
+        if (clientSecretError) {
+          newErrors.clientSecret = clientSecretError;
         } else {
-          const validationError = validateClientSecret(value);
-          if (validationError) {
-            newErrors.clientSecret = validationError;
-          } else {
-            delete newErrors.clientSecret;
-          }
+          delete newErrors.clientSecret;
         }
         break;
     }
@@ -83,29 +75,25 @@ export function CredentialForm({
       environment: true
     });
 
-    // Validate all fields synchronously
+    // Validate all fields and collect errors
     const clientIdError = validateClientId(clientId);
     const clientSecretError = validateClientSecret(clientSecret);
 
-    const newErrors: FormErrors = {};
-    if (clientIdError) newErrors.clientId = clientIdError;
-    if (clientSecretError) newErrors.clientSecret = clientSecretError;
-
-    // Update errors state and check validation
-    setErrors((prevErrors) => {
-      const updatedErrors = { ...prevErrors, ...newErrors };
-      
-      // Check if there are any errors
-      if (Object.keys(updatedErrors).length === 0 && clientId.trim() && clientSecret.trim()) {
-        onSubmit({
-          environment,
-          clientId: clientId.trim(),
-          clientSecret: clientSecret.trim()
-        });
-      }
-      
-      return updatedErrors;
+    // Set all errors at once
+    setErrors({
+      clientId: clientIdError || undefined,
+      clientSecret: clientSecretError || undefined,
+      environment: undefined
     });
+
+    // Check if there are any errors
+    if (!clientIdError && !clientSecretError && clientId.trim() && clientSecret.trim()) {
+      onSubmit({
+        environment,
+        clientId: clientId.trim(),
+        clientSecret: clientSecret.trim()
+      });
+    }
   };
 
   const isFormValid = clientId.trim() && clientSecret.trim() && Object.keys(errors).length === 0;

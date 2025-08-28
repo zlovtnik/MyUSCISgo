@@ -26,7 +26,7 @@ export function validateClientId(value: string): string | null {
 }
 
 export function validateClientSecret(value: string): string | null {
-  if (!value) {
+  if (!value.trim()) {
     return 'Client secret is required';
   }
 

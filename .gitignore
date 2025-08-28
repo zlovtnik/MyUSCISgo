@@ -96,3 +96,4 @@ jspm_packages/
 
 #playwright
 .playwright/
+frontend/playwright-report/index.html
