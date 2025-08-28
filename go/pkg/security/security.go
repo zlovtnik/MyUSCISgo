@@ -25,8 +25,8 @@ func (t *OAuthToken) IsExpired() bool {
 	return time.Now().After(t.ExpiresAt)
 }
 
-// HashSecret creates a temporary hash of the client secret for processing
-// This is a one-way hash that cannot be reversed
+// HashSecret creates a temporary, time-salted hash of the client secret for transient processing.
+// NOTE: Non-deterministic by design; do NOT persist or compare across calls.
 func HashSecret(secret string) string {
 	// Add a timestamp salt to make it time-sensitive
 	salt := fmt.Sprintf("%d", time.Now().UnixNano())
@@ -83,6 +83,7 @@ func RefreshOAuthToken(clientID, clientSecret, refreshToken string) (*OAuthToken
 }
 
 // ValidateOAuthToken validates an OAuth token format and expiration
+// TODO: Consider injecting time.Now via a var to test edge cases (skew, near-expiry)
 func ValidateOAuthToken(token *OAuthToken) error {
 	if token == nil {
 		return fmt.Errorf("token is nil")
@@ -194,7 +195,6 @@ func ClearSensitiveData(data []byte) {
 
 // IsSecureEnvironment checks if we're running in a secure environment
 func IsSecureEnvironment() bool {
-	// In WASM context, we consider it secure if we're running in HTTPS
-	// This is a simplified check - in production, you'd want more robust checks
-	return true // For WASM, we'll assume secure context
+	// TODO: inject a checker or read an env/config flag set by the host (e.g., HTTPS detected).
+	return false
 }

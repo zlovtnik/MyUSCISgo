@@ -26,7 +26,7 @@ type OAuthToken struct {
 	AccessToken string `json:"access_token"`
 	TokenType   string `json:"token_type"`
 	ExpiresIn   int    `json:"expires_in"`
-	ExpiresAt   string `json:"expires_at"`
+	ExpiresAt   string `json:"expires_at"` // RFC3339
 	Scope       string `json:"scope,omitempty"`
 }
 

@@ -22,7 +22,7 @@ func NewProcessor() *Processor {
 	}
 }
 
-// ProcessCredentialsAsync processes credentials asynchronously using Go 1.25 features
+// ProcessCredentialsAsync processes credentials asynchronously using Go concurrency features
 func (p *Processor) ProcessCredentialsAsync(ctx context.Context, creds *types.Credentials) (<-chan *types.ProcessingResult, <-chan error) {
 	resultCh := make(chan *types.ProcessingResult, 1)
 	errCh := make(chan error, 1)
@@ -121,7 +121,7 @@ func (p *Processor) processWithContext(ctx context.Context, creds *types.Credent
 
 	// Process based on environment
 	result := &types.ProcessingResult{
-		TokenHint:  token,
+		TokenHint:  token, // Contains the full secure token for processing (rename to SecureToken if this causes confusion)
 		OAuthToken: convertToTypesOAuthToken(oauthToken),
 		Config:     make(map[string]string),
 	}
@@ -201,6 +201,11 @@ func (p *Processor) processWithContext(ctx context.Context, creds *types.Credent
 				"scope":       newToken.Scope,
 			})
 		}
+	}
+
+	// Optionally simulate USCIS API call
+	if err := p.SimulateAPI(ctx, result, creds.Environment); err != nil {
+		return nil, err
 	}
 
 	return result, nil

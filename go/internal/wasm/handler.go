@@ -46,7 +46,7 @@ func NewHandler() *Handler {
 func (h *Handler) ProcessCredentialsAsync(this js.Value, args []js.Value) any {
 	defer func() {
 		if r := recover(); r != nil {
-			h.logger.Fatal("Panic in ProcessCredentialsAsync", fmt.Errorf("%v", r), map[string]interface{}{
+			h.logger.Error("Panic in ProcessCredentialsAsync", fmt.Errorf("%v", r), map[string]interface{}{
 				"stack": string(debug.Stack()),
 			})
 			js.Global().Get("console").Call("error", fmt.Sprintf(PanicMsg, r))
@@ -247,7 +247,7 @@ func (h *Handler) HealthCheck(this js.Value, args []js.Value) any {
 func (h *Handler) SendRealtimeUpdate(this js.Value, args []js.Value) any {
 	defer func() {
 		if r := recover(); r != nil {
-			h.logger.Fatal("Panic in SendRealtimeUpdate", fmt.Errorf("%v", r), map[string]interface{}{
+			h.logger.Error("Panic in SendRealtimeUpdate", fmt.Errorf("%v", r), map[string]interface{}{
 				"stack": string(debug.Stack()),
 			})
 			js.Global().Get("console").Call("error", fmt.Sprintf(PanicMsg, r))

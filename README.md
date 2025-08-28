@@ -316,7 +316,7 @@ sequenceDiagram
 
 ### Technical Requirements
 
-- Go 1.21+ (with WebAssembly support for browser execution and modular architecture).
+- Go 1.25+ (with WebAssembly support for browser execution and modular architecture).
 - React 18+ for the frontend, with hooks for state management and TypeScript for type safety.
 - Vite for bundling (preferred over Webpack for faster development and builds).
 - Web Workers for non-blocking WASM execution with caching and request management.
