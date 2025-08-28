@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CredentialForm } from '../components/forms/CredentialForm';
 
@@ -24,10 +24,12 @@ describe('CredentialForm', () => {
     render(<CredentialForm onSubmit={mockOnSubmit} />);
 
     const submitButton = screen.getByRole('button', { name: /submit credentials/i });
-    await user.click(submitButton);
+    fireEvent.click(submitButton);
 
-    expect(await screen.findByText('Client ID is required')).toBeInTheDocument();
-    expect(await screen.findByText('Client Secret is required')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Client ID is required')).toBeInTheDocument();
+      expect(screen.getByText('Client secret is required')).toBeInTheDocument();
+    });
 
     expect(mockOnSubmit).not.toHaveBeenCalled();
   });
