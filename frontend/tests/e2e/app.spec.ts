@@ -67,17 +67,6 @@ test.describe('WASM App E2E Tests', () => {
     await expect(page.getByRole('alert')).toHaveCount(2); // clientId, clientSecret
   });
 
-  test('should show validation errors for empty fields', async ({ page }) => {
-    // Wait for WASM to load
-    await page.waitForSelector('button[type="submit"]:not([disabled])', { timeout: 15000 });
-
-    // Click submit without filling fields
-    await page.click('button[type="submit"]');
-
-    // Check for validation errors - only clientId and clientSecret are validated client-side
-    await expect(page.getByRole('alert')).toHaveCount(2); // clientId, clientSecret
-  });
-
   test('should accept valid credentials and show results', async ({ page }) => {
     // Wait for WASM to load
     await page.waitForSelector('button[type="submit"]:not([disabled])', { timeout: 15000 });
