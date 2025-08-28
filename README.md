@@ -6,25 +6,214 @@ This project delivers a robust WebAssembly (WASM) application with Go handling b
 
 ## Architecture
 
+### Development Workflow & Build Pipeline
+
 ```mermaid
-graph TD;
-    A["React Frontend"] <--> B["Go WASM Module"];
-    B --> C["External Services (via JS Bridge)"];
-    D["Nginx Server"] --> A;
-    D --> B;
-    
-    subgraph "Browser"
-    A
-    B
+graph TB
+    %% Development Phase
+    subgraph "Development Environment"
+        DEV[Developer Workspace]
+        GO_SRC[Go Source Code<br/>/go/main.go]
+        REACT_SRC[React TypeScript Source<br/>/frontend/src/]
+        BUILD_TS[Build System<br/>build.ts]
+        CONFIGS[Configuration Files<br/>Dockerfile, nginx.conf,<br/>vite.config.ts]
     end
-    
-    subgraph "Server"
-    D
+
+    %% Build Process
+    subgraph "Build Pipeline"
+        GO_BUILD[Go WASM Compilation<br/>GOOS=js GOARCH=wasm]
+        REACT_BUILD[React Build<br/>Vite + TypeScript]
+        ASSET_COPY[Asset Processing<br/>wasm_exec.js, static files]
+        DOCKER_BUILD[Docker Image Build<br/>Multi-stage Dockerfile]
     end
-    
-    subgraph "External"
-    C
+
+    %% Runtime Architecture
+    subgraph "Runtime Environment (Browser + Server)"
+        subgraph "Browser Environment"
+            REACT_APP[React Application<br/>SPA with Components]
+            WASM_WORKER[Web Worker<br/>WASM Execution Context]
+            GO_WASM[Go WASM Module<br/>Compiled Business Logic]
+        end
+
+        subgraph "Server Environment"
+            NGINX[Nginx Server<br/>Static File Serving<br/>+ Reverse Proxy]
+            DOCKER[Docker Container<br/>Production Runtime]
+        end
     end
+
+    %% Testing Infrastructure
+    subgraph "Testing & Quality Assurance"
+        UNIT_TESTS[Unit Tests<br/>Go Tests + Vitest]
+        E2E_TESTS[E2E Tests<br/>Playwright]
+        LINTING[Code Quality<br/>ESLint + Prettier]
+        CI_CD[CI/CD Pipeline<br/>GitHub Actions]
+    end
+
+    %% Deployment
+    subgraph "Deployment Pipeline"
+        REGISTRY[Container Registry<br/>Docker Hub/GHCR]
+        PROD_ENV[Production Environment<br/>Cloud/On-premise]
+        MONITORING[Monitoring & Logging<br/>Health Checks]
+    end
+
+    %% Data Flow
+    DEV --> GO_SRC
+    DEV --> REACT_SRC
+    DEV --> BUILD_TS
+    DEV --> CONFIGS
+
+    GO_SRC --> GO_BUILD
+    REACT_SRC --> REACT_BUILD
+    BUILD_TS --> GO_BUILD
+    BUILD_TS --> REACT_BUILD
+    BUILD_TS --> ASSET_COPY
+
+    GO_BUILD --> DOCKER_BUILD
+    REACT_BUILD --> DOCKER_BUILD
+    ASSET_COPY --> DOCKER_BUILD
+    CONFIGS --> DOCKER_BUILD
+
+    DOCKER_BUILD --> REGISTRY
+    REGISTRY --> PROD_ENV
+
+    %% Runtime Flow
+    REACT_APP --> WASM_WORKER
+    WASM_WORKER --> GO_WASM
+    GO_WASM --> REACT_APP
+
+    NGINX --> REACT_APP
+    DOCKER --> NGINX
+
+    %% Testing Flow
+    GO_SRC --> UNIT_TESTS
+    REACT_SRC --> UNIT_TESTS
+    REACT_SRC --> E2E_TESTS
+    GO_SRC --> LINTING
+    REACT_SRC --> LINTING
+
+    UNIT_TESTS --> CI_CD
+    E2E_TESTS --> CI_CD
+    LINTING --> CI_CD
+
+    CI_CD --> DOCKER_BUILD
+    PROD_ENV --> MONITORING
+
+    %% Styling
+    classDef development fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef build fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef runtime fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef testing fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef deployment fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+
+    class DEV,GO_SRC,REACT_SRC,BUILD_TS,CONFIGS development
+    class GO_BUILD,REACT_BUILD,ASSET_COPY,DOCKER_BUILD build
+    class REACT_APP,WASM_WORKER,GO_WASM,NGINX,DOCKER runtime
+    class UNIT_TESTS,E2E_TESTS,LINTING,CI_CD testing
+    class REGISTRY,PROD_ENV,MONITORING deployment
+```
+
+### Component Architecture
+
+```mermaid
+graph TD
+    subgraph "React Frontend Architecture"
+        APP[App.tsx<br/>Main Component]
+        FORM[CredentialForm<br/>Input Validation]
+        RESULTS[ResultsDisplay<br/>JSON Viewer]
+        LOADER[LoadingSpinner<br/>Async States]
+        ERROR[ErrorBoundary<br/>Error Handling]
+        WORKER_HOOK[useWasmWorker<br/>WASM Integration]
+    end
+
+    subgraph "Go WASM Module Architecture"
+        MAIN[main.go<br/>Entry Point]
+        CREDENTIALS[Credentials Struct<br/>Data Model]
+        PROCESSOR[processCredentials<br/>Core Logic]
+        VALIDATOR[Input Validation<br/>Security Layer]
+        ENV_HANDLER[Environment Handler<br/>Config Logic]
+        ERROR_HANDLER[Error Handler<br/>Panic Recovery]
+    end
+
+    subgraph "Build System Architecture"
+        BUILD_SCRIPT[build.ts<br/>Orchestrator]
+        GO_COMPILER[Go Compiler<br/>WASM Target]
+        VITE_BUILDER[Vite Builder<br/>React Bundle]
+        ASSET_MANAGER[Asset Manager<br/>File Operations]
+        DOCKER_BUILDER[Docker Builder<br/>Containerization]
+    end
+
+    %% Component Relationships
+    APP --> FORM
+    APP --> RESULTS
+    APP --> LOADER
+    APP --> ERROR
+    APP --> WORKER_HOOK
+
+    WORKER_HOOK --> MAIN
+    FORM --> WORKER_HOOK
+    RESULTS --> WORKER_HOOK
+
+    MAIN --> CREDENTIALS
+    MAIN --> PROCESSOR
+    PROCESSOR --> VALIDATOR
+    PROCESSOR --> ENV_HANDLER
+    PROCESSOR --> ERROR_HANDLER
+
+    BUILD_SCRIPT --> GO_COMPILER
+    BUILD_SCRIPT --> VITE_BUILDER
+    BUILD_SCRIPT --> ASSET_MANAGER
+    BUILD_SCRIPT --> DOCKER_BUILDER
+
+    GO_COMPILER --> MAIN
+    VITE_BUILDER --> APP
+    ASSET_MANAGER --> MAIN
+    DOCKER_BUILDER --> BUILD_SCRIPT
+```
+
+### Data Flow Architecture
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant R as React App
+    participant W as Web Worker
+    participant G as Go WASM
+    participant N as Nginx
+    participant D as Docker
+
+    Note over U,D: Application Startup
+    U->>R: Access Application
+    R->>N: Request Static Files
+    N-->>R: Serve HTML/CSS/JS
+    R->>W: Initialize WASM Worker
+    W->>N: Fetch main.wasm
+    N-->>W: Serve WASM Binary
+    W->>G: Instantiate WASM Module
+    G-->>W: Module Ready
+
+    Note over U,D: User Interaction
+    U->>R: Submit Credentials
+    R->>R: Validate Form Data
+    R->>W: Send Credentials to Worker
+    W->>G: Call goProcessCredentials()
+    G->>G: Validate & Process Data
+    G-->>W: Return Results
+    W-->>R: Send Results to Main Thread
+    R-->>U: Display Results
+
+    Note over U,D: Error Handling
+    U->>R: Submit Invalid Data
+    R->>W: Send Invalid Credentials
+    W->>G: Call goProcessCredentials()
+    G->>G: Detect Validation Error
+    G-->>W: Return Error Response
+    W-->>R: Forward Error
+    R-->>U: Show Error Message
+
+    Note over U,D: Deployment
+    D->>N: Container Startup
+    N->>D: Health Check
+    D-->>N: Ready Status
 ```
 
 ## Requirements
@@ -41,18 +230,19 @@ graph TD;
 
 ### Technical Requirements
 
-- Go 1.25+ (with enhanced WebAssembly support for better performance and async features).
+- Go 1.21+ (with WebAssembly support for browser execution).
 - React 18+ for the frontend, with hooks for state management.
 - Vite for bundling (preferred over Webpack for faster development and builds).
-- Proper error handling and logging between Go and JavaScript.
-- Secure credential handling using ephemeral memory and input validation.
+- TypeScript for type safety in both Go and React code.
+- Web Workers for non-blocking WASM execution.
+- Docker for containerization and deployment.
 - Nginx for serving static files (React build, WASM binary, and assets) in production for improved performance, caching, and security.
 
 ## Tasks
 
 ### Setup Phase
 
-- [x] Set up the Go development environment with WebAssembly support (Go 1.25+).
+- [x] Set up the Go development environment with WebAssembly support (Go 1.21+).
 - [x] Create a new React project using Vite for faster bundling and HMR.
 - [x] Organize project structure: `/go` for Go code, `/frontend` for React code, `/nginx` for config files.
 - [x] Configure Vite to handle WASM files (e.g., via plugins for binary loading).
@@ -66,7 +256,7 @@ graph TD;
 - [x] Expand environment-specific logic (e.g., simulate API calls via JS bridge).
 - [x] Add comprehensive error handling, structured logging, and panic recovery.
 - [x] Build and test Go to WASM, optimizing binary size with build flags.
-- [x] Use Go's new async WASM features in 1.25 for non-blocking operations.
+- [x] Use Go's WebAssembly features for non-blocking operations.
 
 ### React Frontend Development
 
@@ -102,92 +292,92 @@ graph TD;
 package main
 
 import (
-	"syscall/js"
-	"encoding/json"
-	"fmt"
-	"runtime/debug"
-	"strings"
+    "syscall/js"
+    "encoding/json"
+    "fmt"
+    "runtime/debug"
+    "strings"
 )
 
 type Credentials struct {
-	ClientID     string `json:"clientId"`
-	ClientSecret string `json:"clientSecret"`
-	Environment  string `json:"environment"`
+    ClientID     string `json:"clientId"`
+    ClientSecret string `json:"clientSecret"`
+    Environment  string `json:"environment"`
 }
 
 func processCredentials(this js.Value, args []js.Value) any {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("Recovered from panic: %v\nStack: %s\n", r, debug.Stack())
-			js.Global().Get("console").Call("error", fmt.Sprintf("Go panic: %v", r))
-		}
-	}()
+    defer func() {
+        if r := recover(); r != nil {
+            fmt.Printf("Recovered from panic: %v\nStack: %s\n", r, debug.Stack())
+            js.Global().Get("console").Call("error", fmt.Sprintf("Go panic: %v", r))
+        }
+    }()
 
-	if len(args) != 1 {
-		return js.ValueOf(map[string]any{"error": "Invalid number of arguments"})
-	}
+    if len(args) != 1 {
+        return js.ValueOf(map[string]any{"error": "Invalid number of arguments"})
+    }
 
-	// Parse credentials
-	var creds Credentials
-	credJSON := args[0].String()
-	if err := json.Unmarshal([]byte(credJSON), &creds); err != nil {
-		return js.ValueOf(map[string]any{"error": fmt.Sprintf("Failed to parse: %v", err)})
-	}
+    // Parse credentials
+    var creds Credentials
+    credJSON := args[0].String()
+    if err := json.Unmarshal([]byte(credJSON), &creds); err != nil {
+        return js.ValueOf(map[string]any{"error": fmt.Sprintf("Failed to parse: %v", err)})
+    }
 
-	// Validate inputs
-	if creds.ClientID == "" || creds.ClientSecret == "" || !isValidEnvironment(creds.Environment) {
-		return js.ValueOf(map[string]any{"error": "Invalid credentials or environment"})
-	}
+    // Validate inputs
+    if creds.ClientID == "" || creds.ClientSecret == "" || !isValidEnvironment(creds.Environment) {
+        return js.ValueOf(map[string]any{"error": "Invalid credentials or environment"})
+    }
 
-	// Process asynchronously (simulate with Go 1.25 async support)
-	result := processBasedOnEnvironment(creds)
+    // Process asynchronously (simulate async support)
+    result := processBasedOnEnvironment(creds)
 
-	return js.ValueOf(map[string]any{
-		"success": true,
-		"result":  result,
-	})
+    return js.ValueOf(map[string]any{
+        "success": true,
+        "result":  result,
+    })
 }
 
 func isValidEnvironment(env string) bool {
-	valid := []string{"development", "staging", "production"}
-	for _, v := range valid {
-		if strings.EqualFold(env, v) {
-			return true
-		}
-	}
-	return false
+    valid := []string{"development", "staging", "production"}
+    for _, v := range valid {
+        if strings.EqualFold(env, v) {
+            return true
+        }
+    }
+    return false
 }
 
 func processBasedOnEnvironment(creds Credentials) map[string]string {
-	// Enhanced logic: Simulate environment-specific processing, e.g., config generation
-	config := map[string]string{
-		"baseURL": "",
-		"authMode": "basic",
-	}
-	switch creds.Environment {
-	case "development":
-		config["baseURL"] = "http://localhost:8080"
-		config["authMode"] = "debug"
-	case "staging":
-		config["baseURL"] = "https://staging.example.com"
-		config["authMode"] = "test"
-	case "production":
-		config["baseURL"] = "https://api.example.com"
-		config["authMode"] = "secure"
-	}
-	// Simulate using credentials (e.g., hash or token generation, but keep client-side)
-	config["tokenHint"] = fmt.Sprintf("Token for %s (secret hashed)", creds.ClientID)
-	return config
+    // Enhanced logic: Simulate environment-specific processing, e.g., config generation
+    config := map[string]string{
+        "baseURL": "",
+        "authMode": "basic",
+    }
+    switch creds.Environment {
+    case "development":
+        config["baseURL"] = "http://localhost:8080"
+        config["authMode"] = "debug"
+    case "staging":
+        config["baseURL"] = "https://staging.example.com"
+        config["authMode"] = "test"
+    case "production":
+        config["baseURL"] = "https://api.example.com"
+        config["authMode"] = "secure"
+    }
+    // Simulate using credentials (e.g., hash or token generation, but keep client-side)
+    config["tokenHint"] = fmt.Sprintf("Token for %s (secret hashed)", creds.ClientID)
+    return config
 }
 
 func main() {
-	c := make(chan struct{}, 0)
-	
-	// Register async function
-	js.Global().Set("goProcessCredentials", js.FuncOf(processCredentials))
-	
-	fmt.Println("WASM Go Initialized (Go 1.25)")
-	<-c // Block to keep running
+    c := make(chan struct{}, 0)
+    
+    // Register async function
+    js.Global().Set("goProcessCredentials", js.FuncOf(processCredentials))
+    
+    fmt.Println("WASM Go Initialized")
+    <-c // Block to keep running
 }
 ```
 
@@ -340,10 +530,10 @@ export default App;
 ### Compiling Go to WASM
 
 ```bash
-# Set environment for WASM (Go 1.25+ optimizations)
+# Set environment for WASM (Go 1.21+ optimizations)
 GOOS=js GOARCH=wasm go build -o public/main.wasm -ldflags="-s -w" -trimpath
 
-# Copy wasm_exec.js (updated in Go 1.25)
+# Copy wasm_exec.js
 cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" public/
 ```
 
@@ -360,13 +550,29 @@ npm run dev
 npm run build
 ```
 
+### Using the Custom Build System
+
+The project includes a comprehensive build system (`build.ts`) that orchestrates the entire build process:
+
+```bash
+# Run the complete build pipeline
+deno run --allow-read --allow-write --allow-run --allow-net build.ts
+
+# The build system handles:
+# - Go WASM compilation
+# - React/TypeScript building
+# - Asset copying and optimization
+# - Docker image building
+# - Development server setup
+```
+
 ## Nginx Configuration for Deployment
 
 Use Nginx to serve the built React app and WASM files with compression, caching, and security headers.
 
 ### Example Nginx Config (/nginx/nginx.conf)
 
-```
+```nginx
 server {
     listen 80;
     server_name example.com;
