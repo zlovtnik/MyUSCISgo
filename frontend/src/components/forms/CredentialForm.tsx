@@ -160,7 +160,7 @@ export function CredentialForm({
           spellCheck="false"
         />
         {errors.clientSecret && (
-          <p className="mt-1 text-sm text-red-600" role="alert">
+          <p key={errors.clientSecret} className="mt-1 text-sm text-red-600" role="alert">
             {errors.clientSecret}
           </p>
         )}
