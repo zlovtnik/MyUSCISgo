@@ -155,6 +155,7 @@ export function TokenCertification({ onSubmit }: TokenCertificationProps) {
               value={formData.token}
               onChange={handleInputChange('token')}
               placeholder="Enter your USCIS API token"
+              autoComplete="off"
               className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
                 errors.token ? 'border-red-500' : 'border-gray-300'
               }`}
@@ -175,6 +176,7 @@ export function TokenCertification({ onSubmit }: TokenCertificationProps) {
               value={formData.caseNumber}
               onChange={handleInputChange('caseNumber')}
               placeholder="ABC1234567890"
+              pattern="[A-Z]{3}[0-9]{10}"
               className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
                 errors.caseNumber ? 'border-red-500' : 'border-gray-300'
               }`}
