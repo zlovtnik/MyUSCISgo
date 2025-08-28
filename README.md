@@ -323,13 +323,13 @@ sequenceDiagram
 - Docker for containerization and deployment with multi-stage builds.
 - Nginx for serving static files with compression, caching, and security headers.
 - Modular Go architecture with separate packages for:
-  - Processing (business logic and environment configuration)
-  - Validation (input validation and security checks)
-  - Logging (structured logging and error tracking)
-  - Rate limiting (request throttling and DDoS protection)
-  - Security (encryption and credential protection)
-  - Tracking (usage analytics and performance metrics)
-  - Types (data models and type definitions)
+  - Processing (business logic and environment configuration).
+  - Validation (input validation and security checks).
+  - Logging (structured logging and error tracking).
+  - Rate limiting (request throttling and DDoS protection).
+  - Security (encryption and credential protection).
+  - Tracking (usage analytics and performance metrics).
+  - Types (data models and type definitions).
 
 ## Tasks
 
@@ -666,10 +666,22 @@ Use Nginx to serve the built React app and WASM files with compression, caching,
 ### Example Nginx Config (/nginx/nginx.conf)
 
 ```nginx
+# HTTP to HTTPS redirect server
 server {
     listen 80;
     server_name example.com;
+    return 301 https://$host$request_uri;
+}
+
+# HTTPS server
+server {
+    listen 443 ssl http2;
+    server_name example.com;
     root /usr/share/nginx/html;  # Point to React build directory
+
+    # SSL configuration (add your certificates)
+    # ssl_certificate /path/to/cert.pem;
+    # ssl_certificate_key /path/to/key.pem;
 
     # Enable gzip compression
     gzip on;
@@ -690,11 +702,6 @@ server {
     add_header X-Content-Type-Options nosniff;
     add_header X-Frame-Options DENY;
     add_header X-XSS-Protection "1; mode=block";
-
-    # Redirect to HTTPS in production
-    if ($scheme != "https") {
-        return 301 https://$host$request_uri;
-    }
 }
 ```
 
