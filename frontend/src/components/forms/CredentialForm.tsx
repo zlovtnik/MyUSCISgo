@@ -24,7 +24,7 @@ export function CredentialForm({
     const newErrors = { ...errors };
 
     switch (field) {
-      case 'clientId':
+      case 'clientId': {
         const clientIdError = validateClientId(value);
         if (clientIdError) {
           newErrors.clientId = clientIdError;
@@ -32,7 +32,8 @@ export function CredentialForm({
           delete newErrors.clientId;
         }
         break;
-      case 'clientSecret':
+      }
+      case 'clientSecret': {
         const clientSecretError = validateClientSecret(value);
         if (clientSecretError) {
           newErrors.clientSecret = clientSecretError;
@@ -40,6 +41,7 @@ export function CredentialForm({
           delete newErrors.clientSecret;
         }
         break;
+      }
     }
 
     setErrors(newErrors);
