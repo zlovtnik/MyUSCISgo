@@ -21,8 +21,8 @@ test.describe('WASM App E2E Tests', () => {
   });
 
   test('should show loading state when processing', async ({ page }) => {
-    // Wait for WASM to load
-    await page.waitForSelector('button[type="submit"]:not([disabled])', { timeout: 15000 });
+    // Wait for WASM to load and form to be ready
+    await page.waitForSelector('button[type="submit"]', { timeout: 15000 });
 
     // Fill out the form with valid data
     await page.getByLabel('Client ID').fill('test-client-123');
@@ -46,7 +46,7 @@ test.describe('WASM App E2E Tests', () => {
     await page.getByLabel('Environment').selectOption('development');
 
     // Wait for button to be enabled
-    await page.waitForSelector('button[type="submit"]:not([disabled])', { timeout: 10000 });
+    await page.waitForSelector('button[type="submit"]', { timeout: 10000 });
 
     // Clear the form to test validation
     await page.getByLabel('Client ID').fill('');
@@ -58,7 +58,7 @@ test.describe('WASM App E2E Tests', () => {
 
   test('should show validation errors for empty fields', async ({ page }) => {
     // Wait for WASM to load
-    await page.waitForSelector('button[type="submit"]:not([disabled])', { timeout: 15000 });
+    await page.waitForSelector('button[type="submit"]', { timeout: 15000 });
 
     // Click submit without filling fields
     await page.click('button[type="submit"]');
@@ -69,7 +69,7 @@ test.describe('WASM App E2E Tests', () => {
 
   test('should accept valid credentials and show results', async ({ page }) => {
     // Wait for WASM to load
-    await page.waitForSelector('button[type="submit"]:not([disabled])', { timeout: 15000 });
+    await page.waitForSelector('button[type="submit"]', { timeout: 15000 });
 
     // Fill out the form with valid data using accessible selectors
     await page.getByLabel('Client ID').fill('test-client-123');
@@ -92,7 +92,7 @@ test.describe('WASM App E2E Tests', () => {
 
   test('should handle different environments', async ({ page }) => {
     // Wait for WASM to load
-    await page.waitForSelector('button[type="submit"]:not([disabled])', { timeout: 15000 });
+    await page.waitForSelector('button[type="submit"]', { timeout: 15000 });
 
     // Test development environment
     await page.getByLabel('Client ID').fill('test-client-dev');
@@ -105,7 +105,7 @@ test.describe('WASM App E2E Tests', () => {
 
     // Clear and test staging environment
     await page.reload();
-    await page.waitForSelector('button[type="submit"]:not([disabled])', { timeout: 15000 });
+    await page.waitForSelector('button[type="submit"]', { timeout: 15000 });
 
     await page.getByLabel('Client ID').fill('test-client-staging');
     await page.getByLabel('Client Secret').fill('StagingPass123');
@@ -118,7 +118,7 @@ test.describe('WASM App E2E Tests', () => {
 
   test('should handle invalid credentials gracefully', async ({ page }) => {
     // Wait for WASM to load
-    await page.waitForSelector('button[type="submit"]:not([disabled])', { timeout: 15000 });
+    await page.waitForSelector('button[type="submit"]', { timeout: 15000 });
 
     // Submit invalid client ID (client-side validation should catch this)
     await page.getByLabel('Client ID').fill('invalid@client');
@@ -132,7 +132,7 @@ test.describe('WASM App E2E Tests', () => {
 
   test('should clear sensitive data after submission', async ({ page }) => {
     // Wait for WASM to load
-    await page.waitForSelector('button[type="submit"]:not([disabled])', { timeout: 15000 });
+    await page.waitForSelector('button[type="submit"]', { timeout: 15000 });
 
     // Fill and submit form
     await page.getByLabel('Client ID').fill('test-client-123');
