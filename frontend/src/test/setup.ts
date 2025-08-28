@@ -25,27 +25,28 @@ const mockWorker = class Worker {
     // Mock implementation
   }
 
-  addEventListener(type: string, listener: any) {
+  addEventListener(type: string, listener: EventListener) {
     if (type === 'message') {
-      this.onmessage = listener;
+      this.onmessage = listener as (e: MessageEvent) => void;
     } else if (type === 'error') {
-      this.onerror = listener;
+      this.onerror = listener as (e: ErrorEvent) => void;
     }
   }
 
-  removeEventListener(type: string, listener: any) {
+  removeEventListener(type: string) {
     if (type === 'message') {
       this.onmessage = null;
     } else if (type === 'error') {
-      this.onerror = listener;
+      this.onerror = null;
     }
   }
 };
 
-(globalThis as any).Worker = mockWorker;
+// Mock global Worker for tests
+(globalThis as unknown as { Worker: unknown }).Worker = mockWorker;
 
 // Mock fetch for WASM loading
-(globalThis as any).fetch = () =>
+(globalThis as unknown as { fetch: unknown }).fetch = () =>
   Promise.resolve({
     arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
   });
