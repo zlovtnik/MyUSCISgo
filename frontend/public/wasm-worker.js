@@ -2,6 +2,7 @@
 // This worker handles the WASM module loading and execution to offload from main thread
 
 let wasmInstance = null;
+let wasmCertifyInstance = null;
 let isInitialized = false;
 let cache = new Map(); // Simple cache for results
 
@@ -92,6 +93,7 @@ async function initializeWASM() {
     go.run(result.instance);
 
     wasmInstance = self.goProcessCredentials;
+    wasmCertifyInstance = self.goCertifyToken;
     isInitialized = true;
 
     self.postMessage({ type: 'initialized' });
@@ -137,6 +139,29 @@ async function processCredentials(credentials) {
   }
 }
 
+// Process token certification
+async function certifyToken(tokenData) {
+  if (!isInitialized || !wasmCertifyInstance) {
+    throw new Error('WASM not initialized');
+  }
+
+  try {
+    const response = await wasmCertifyInstance(JSON.stringify(tokenData));
+    
+    // Parse the JSON response from WASM
+    let result;
+    try {
+      result = JSON.parse(response);
+    } catch (parseError) {
+      throw new Error(`Failed to parse WASM certification response: ${response} (parse error: ${parseError.message})`);
+    }
+
+    return result;
+  } catch (error) {
+    throw new Error(`Token certification failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
 // Handle messages from main thread
 self.onmessage = async (e) => {
   const { type, data } = e.data;
@@ -177,6 +202,23 @@ self.onmessage = async (e) => {
         self.postMessage({
           type: 'health-result',
           result: health,
+          requestId: e.data.requestId
+        });
+      } catch (error) {
+        self.postMessage({
+          type: 'error',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          requestId: e.data.requestId
+        });
+      }
+      break;
+
+    case 'certify-token':
+      try {
+        const result = await certifyToken(data);
+        self.postMessage({
+          type: 'certify-result',
+          result,
           requestId: e.data.requestId
         });
       } catch (error) {
