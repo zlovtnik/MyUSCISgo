@@ -54,11 +54,22 @@ export interface FormErrors {
   general?: string;
 }
 
-export interface FormState {
-  clientId: string;
-  clientSecret: string;
-  environment: Environment;
-  errors: FormErrors;
-  isSubmitting: boolean;
+export interface TokenCertificationResult {
   isValid: boolean;
+  caseStatus: string;
+  lastUpdated: string;
+  caseDetails: Record<string, string>;
+  verificationId: string;
+}
+
+export interface TokenCertificationData {
+  readonly token: string;
+  readonly caseNumber: string;
+  readonly environment: 'development' | 'production';
+}
+
+export interface TokenCertificationResponse {
+  success: boolean;
+  result?: TokenCertificationResult;
+  error?: string;
 }
