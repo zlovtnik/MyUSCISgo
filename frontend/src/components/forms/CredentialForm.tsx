@@ -44,7 +44,13 @@ export function CredentialForm({
       }
     }
 
-    setErrors(newErrors);
+    // Filter out undefined values to ensure only actual errors are stored
+    const filteredErrors: FormErrors = {};
+    if (newErrors.clientId !== undefined) filteredErrors.clientId = newErrors.clientId;
+    if (newErrors.clientSecret !== undefined) filteredErrors.clientSecret = newErrors.clientSecret;
+    if (newErrors.environment !== undefined) filteredErrors.environment = newErrors.environment;
+    if (newErrors.general !== undefined) filteredErrors.general = newErrors.general;
+    setErrors(filteredErrors);
   };
 
   const handleFieldChange = (field: string, value: string) => {
@@ -81,11 +87,17 @@ export function CredentialForm({
       environment: true
     });
     
-    setErrors({
-      clientId: clientIdError || undefined,
-      clientSecret: clientSecretError || undefined,
-      environment: undefined
-    });
+    const nextErrors: FormErrors = {};
+    if (clientIdError) nextErrors.clientId = clientIdError;
+    if (clientSecretError) nextErrors.clientSecret = clientSecretError;
+    
+    // Filter out undefined values to ensure only actual errors are stored
+    const filteredErrors: FormErrors = {};
+    if (nextErrors.clientId !== undefined) filteredErrors.clientId = nextErrors.clientId;
+    if (nextErrors.clientSecret !== undefined) filteredErrors.clientSecret = nextErrors.clientSecret;
+    if (nextErrors.environment !== undefined) filteredErrors.environment = nextErrors.environment;
+    if (nextErrors.general !== undefined) filteredErrors.general = nextErrors.general;
+    setErrors(filteredErrors);
 
     // Check if there are any errors
     if (!clientIdError && !clientSecretError && clientId.trim() && clientSecret.trim()) {
@@ -97,7 +109,7 @@ export function CredentialForm({
     }
   };
 
-  const isFormValid = clientId.trim() && clientSecret.trim() && Object.keys(errors).length === 0;
+  const isFormValid: boolean = Boolean(clientId.trim()) && Boolean(clientSecret.trim()) && Object.values(errors || {}).every(v => !v);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">

@@ -1,12 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Declare process for Node.js environment
-declare const process: {
-  env: {
-    CI?: string;
-  };
-};
-
 /**
  * @see https://playwright.dev/docs/test-configuration
  */

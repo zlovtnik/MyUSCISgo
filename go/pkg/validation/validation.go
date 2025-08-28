@@ -11,10 +11,8 @@ import (
 
 var (
 	// Precompiled regexes for input sanitization
-	rxJSProtocol = regexp.MustCompile(`(?i)javascript\s*:`)
-	rxOnAttr     = regexp.MustCompile(`(?i)\son\w+\s*=`)
-	rxScriptTag  = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
-	rxCtrlChars  = regexp.MustCompile(`[\x00-\x1F\x7F-\x9F]`)
+	rxScriptTag = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
+	rxCtrlChars = regexp.MustCompile(`[\x00-\x1F\x7F-\x9F]`)
 
 	// Precompiled regexes for client secret validation
 	rxHasLetter = regexp.MustCompile(`[a-zA-Z]`)
@@ -121,11 +119,9 @@ func SanitizeInput(input string) string {
 	input = html.EscapeString(input)
 
 	// Handle single quotes separately (html.EscapeString doesn't escape them)
-	input = strings.ReplaceAll(input, "'", "&#x27;")
+	input = strings.ReplaceAll(input, "'", "&#39;")
 
-	// Remove potential JavaScript injection patterns
-	input = rxJSProtocol.ReplaceAllString(input, "")
-	input = rxOnAttr.ReplaceAllString(input, "")
+	// Remove potential script injection patterns (but preserve URL schemes)
 	input = rxScriptTag.ReplaceAllString(input, "")
 
 	// Remove null bytes and control characters

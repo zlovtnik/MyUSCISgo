@@ -17,8 +17,24 @@ import (
 	"MyUSCISgo/pkg/validation"
 )
 
-const (
-	ProcessingTimeoutMsg = "Processing timeout"
+	messageType := args[0].String()
+	data := args[1]
+
+	// Properly serialize the JavaScript object using JSON.stringify
+	jsonStringify := js.Global().Get("JSON").Get("stringify")
+	jsonDataStr := jsonStringify.Invoke(data).String()
+	
+	// Store as json.RawMessage to preserve the original JSON structure
+	var rawData json.RawMessage
+	if err := json.Unmarshal([]byte(jsonDataStr), &rawData); err != nil {
+		h.logger.Error("Failed to unmarshal JSON data", err)
+		return h.createErrorResponse("Failed to process data")
+	}
+
+	h.logger.Debug("Sending realtime update", map[string]interface{}{
+		"messageType": messageType,
+		"data":        jsonDataStr, // Use properly serialized JSON string for logging
+	})gTimeoutMsg = "Processing timeout"
 )
 
 // Handler handles WASM function calls from JavaScript
@@ -86,7 +102,7 @@ func (h *Handler) ProcessCredentialsAsync(this js.Value, args []js.Value) any {
 			"clientId":     creds.ClientID,
 			"environment":  creds.Environment,
 		})
-		return h.createErrorResponse("Rate limit exceeded. Please try again later.")
+		return js.Global().Get("Promise").Call("reject", h.createErrorResponse("Rate limit exceeded. Please try again later."))
 	}
 
 	h.logger.Info("Credentials validated successfully", map[string]interface{}{
@@ -256,19 +272,62 @@ func (h *Handler) SendRealtimeUpdate(this js.Value, args []js.Value) any {
 	messageType := args[0].String()
 	data := args[1]
 
+	// Handle JavaScript data based on its type
+	var processedData interface{}
+	var logDataStr string
+
+	// Check if data is a JavaScript primitive
+	dataType := data.Type()
+	switch dataType {
+	case js.TypeString:
+		// Handle string primitive
+		processedData = data.String()
+		logDataStr = data.String()
+	case js.TypeNumber:
+		// Handle number primitive
+		processedData = data.Float()
+		logDataStr = fmt.Sprintf("%g", data.Float())
+	case js.TypeBoolean:
+		// Handle boolean primitive
+		processedData = data.Bool()
+		logDataStr = fmt.Sprintf("%t", data.Bool())
+	case js.TypeNull, js.TypeUndefined:
+		// Handle null/undefined
+		processedData = nil
+		logDataStr = "null"
+	default:
+		// Handle objects/arrays - use JSON.stringify and unmarshal
+		jsonStringify := js.Global().Get("JSON").Get("stringify")
+		jsonDataStr := jsonStringify.Invoke(data).String()
+		
+		// Try to unmarshal into a Go interface{} to preserve structure
+		var unmarshaled interface{}
+		if err := json.Unmarshal([]byte(jsonDataStr), &unmarshaled); err != nil {
+			h.logger.Warn("Failed to unmarshal JSON data, using raw string", map[string]interface{}{
+				"error": err.Error(),
+				"jsonString": jsonDataStr,
+			})
+			// Fallback: store as string if unmarshaling fails
+			processedData = jsonDataStr
+			logDataStr = jsonDataStr
+		} else {
+			processedData = unmarshaled
+			logDataStr = jsonDataStr
+		}
+	}
+
 	h.logger.Debug("Sending realtime update", map[string]interface{}{
 		"messageType": messageType,
-		"data":        data.String(),
+		"data":        logDataStr, // Use properly processed data for logging
 	})
 
 	// Call JavaScript callback if available
 	jsCallback := js.Global().Get("onRealtimeUpdate")
 	if !jsCallback.IsUndefined() && jsCallback.Type() == js.TypeFunction {
-		// Create update object
-		// Ensure data is JSON-serializable
+		// Create update object with properly processed data
 		update := map[string]interface{}{
 			"type":      messageType,
-			"data":      data.String(), // Convert js.Value to string for JSON marshalling
+			"data":      processedData, // Use processed data (primitives or unmarshaled objects)
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
 		}
 

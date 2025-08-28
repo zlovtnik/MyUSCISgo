@@ -178,10 +178,11 @@ func TestValidateClientID(t *testing.T) {
 	}{
 		{"valid client ID", "test-client-123", false, ""},
 		{"valid client ID with underscores", "test_client_123", false, ""},
+		{"valid client ID with dash and underscore", "test-client_123", false, ""},
 		{"valid alphanumeric", "TestClient123", false, ""},
 		{"empty client ID", "", true, "client ID cannot be empty"},
-		{"client ID with spaces", "test client", true, "must contain only alphanumeric characters"},
-		{"client ID with special chars", "test@client", true, "must contain only alphanumeric characters"},
+		{"client ID with spaces", "test client", true, "must contain only alphanumeric characters, underscores, or dashes"},
+		{"client ID with special chars", "test@client", true, "must contain only alphanumeric characters, underscores, or dashes"},
 		{"too short", "ab", true, "must be between 3 and 100 characters"},
 		{"too long", strings.Repeat("a", 101), true, "must be between 3 and 100 characters"},
 	}
@@ -267,12 +268,12 @@ func TestSanitizeInput(t *testing.T) {
 		{"input with whitespace", "  input  ", "input"},
 		{"empty input", "", ""},
 		{"input with newlines", "line1\nline2", "line1line2"},
-		{"mixed case javascript protocol", "javascript:alert('xss')", "alert(&#39;xss&#39;)"},
-		{"JavaScript protocol uppercase", "JavaScript:alert('xss')", "alert(&#39;xss&#39;)"},
+		{"mixed case javascript protocol", "javascript:alert('xss')", "javascript:alert(&#39;xss&#39;)"},
+		{"JavaScript protocol uppercase", "JavaScript:alert('xss')", "JavaScript:alert(&#39;xss&#39;)"},
 		{"multiline script tag", "<SCRIPT>\nalert('xss');\n</SCRIPT>", "&lt;SCRIPT&gt;alert(&#39;xss&#39;);&lt;/SCRIPT&gt;"},
 		{"multiline script with content", "<script>\n  alert('xss');\n  console.log('test');\n</script>", "&lt;script&gt;  alert(&#39;xss&#39;);  console.log(&#39;test&#39;);&lt;/script&gt;"},
-		{"onClick attribute", "<div onClick=\"alert('xss')\"></div>", "&lt;div&#34;alert(&#39;xss&#39;)&#34;&gt;&lt;/div&gt;"},
-		{"onmouseover attribute", "<img onMouseOver=\"alert('xss')\" />", "&lt;img&#34;alert(&#39;xss&#39;)&#34; /&gt;"},
+		{"onClick attribute", "<div onClick=\"alert('xss')\"></div>", "&lt;div onClick=&#34;alert(&#39;xss&#39;)&#34;&gt;&lt;/div&gt;"},
+		{"onmouseover attribute", "<img onMouseOver=\"alert('xss')\" />", "&lt;img onMouseOver=&#34;alert(&#39;xss&#39;)&#34; /&gt;"},
 	}
 
 	for _, tt := range tests {
