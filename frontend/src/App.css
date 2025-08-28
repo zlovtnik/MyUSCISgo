@@ -6,6 +6,17 @@ body {
     min-height: 100vh;
 }
 
+:root {
+  --brand-navy: #3C3B6E;
+  --brand-red:  #B22234;
+  --focus-ring: rgba(60, 59, 110, 0.1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+  button:hover { transform: none; box-shadow: none; }
+}
+
 .App {
     max-width: 800px;
     margin: 0 auto;
@@ -61,8 +72,8 @@ input[type="text"]:focus,
 input[type="password"]:focus,
 select:focus {
     outline: none;
-    border-color: #3C3B6E;
-    box-shadow: 0 0 0 3px rgba(60, 59, 110, 0.1);
+    border-color: var(--brand-navy);
+    box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 input[type="password"] {
@@ -70,7 +81,7 @@ input[type="password"] {
 }
 
 button {
-    background: linear-gradient(135deg, #3C3B6E 0%, #B22234 100%);
+    background: linear-gradient(135deg, var(--brand-navy) 0%, var(--brand-red) 100%);
     color: #FFFFFF;
     border: none;
     padding: 14px 28px;
