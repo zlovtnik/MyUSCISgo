@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import './App.css';
 import type { Credentials, ProcessingResult } from './types';
 import { useWasm } from './hooks/useWasm';
 import { CredentialForm } from './components/forms/CredentialForm';

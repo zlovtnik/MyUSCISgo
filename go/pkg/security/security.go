@@ -11,6 +11,20 @@ import (
 	"MyUSCISgo/pkg/types"
 )
 
+// OAuthToken represents an OAuth 2.0 access token
+type OAuthToken struct {
+	AccessToken string    `json:"access_token"`
+	TokenType   string    `json:"token_type"`
+	ExpiresIn   int       `json:"expires_in"`
+	ExpiresAt   time.Time `json:"expires_at"`
+	Scope       string    `json:"scope,omitempty"`
+}
+
+// IsExpired checks if the OAuth token has expired
+func (t *OAuthToken) IsExpired() bool {
+	return time.Now().After(t.ExpiresAt)
+}
+
 // HashSecret creates a temporary hash of the client secret for processing
 // This is a one-way hash that cannot be reversed
 func HashSecret(secret string) string {
@@ -36,6 +50,57 @@ func GenerateSecureToken(clientID string) (string, error) {
 
 	hash := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(hash[:]), nil
+}
+
+// GenerateOAuthToken generates a mock OAuth token for USCIS API
+// In production, this would make an actual OAuth request to USCIS
+func GenerateOAuthToken(clientID, clientSecret string) (*OAuthToken, error) {
+	// Generate a secure access token
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return nil, fmt.Errorf("failed to generate token: %w", err)
+	}
+
+	// Create token with expiration (1 hour from now)
+	expiresAt := time.Now().Add(time.Hour)
+
+	token := &OAuthToken{
+		AccessToken: hex.EncodeToString(tokenBytes),
+		TokenType:   "Bearer",
+		ExpiresIn:   3600, // 1 hour in seconds
+		ExpiresAt:   expiresAt,
+		Scope:       "case-status:read",
+	}
+
+	return token, nil
+}
+
+// RefreshOAuthToken refreshes an expired OAuth token
+// In production, this would make a refresh token request to USCIS
+func RefreshOAuthToken(clientID, clientSecret, refreshToken string) (*OAuthToken, error) {
+	// For now, generate a new token (in production, use refresh token)
+	return GenerateOAuthToken(clientID, clientSecret)
+}
+
+// ValidateOAuthToken validates an OAuth token format and expiration
+func ValidateOAuthToken(token *OAuthToken) error {
+	if token == nil {
+		return fmt.Errorf("token is nil")
+	}
+
+	if token.AccessToken == "" {
+		return fmt.Errorf("access token is empty")
+	}
+
+	if token.IsExpired() {
+		return fmt.Errorf("token has expired")
+	}
+
+	if token.TokenType != "Bearer" {
+		return fmt.Errorf("unsupported token type: %s", token.TokenType)
+	}
+
+	return nil
 }
 
 // ValidateSecretFormat performs additional security checks on the secret

@@ -7,8 +7,9 @@ RUN apk add --no-cache git ca-certificates
 # Set working directory
 WORKDIR /app/go
 
-# Copy go mod and sum files
-COPY go/go.mod go/go.sum ./
+# Copy go mod and sum files (go.sum may not exist if no external deps)
+COPY go/go.mod ./
+COPY go/go.sum* ./
 
 # Download dependencies
 RUN go mod download
@@ -20,18 +21,18 @@ COPY go/ .
 RUN GOOS=js GOARCH=wasm go build -o /app/main.wasm -ldflags="-s -w" -trimpath
 
 # Copy wasm_exec.js
-RUN cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" /app/wasm_exec.js
+RUN cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" /app/wasm_exec.js
 
 # React build stage
-FROM node:18-alpine AS react-builder
+FROM node:20-alpine AS react-builder
 
 WORKDIR /app/frontend
 
 # Copy package files
 COPY frontend/package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies (fix rollup issue by using npm install and explicit rollup)
+RUN npm install --production && npm install @rollup/rollup-linux-arm64-musl --save-optional
 
 # Copy source code
 COPY frontend/ .

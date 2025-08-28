@@ -116,7 +116,15 @@ async function processCredentials(credentials) {
       return cachedResult;
     }
 
-    const response = await wasmInstance(JSON.stringify(credentials));
+    const responseString = await wasmInstance(JSON.stringify(credentials));
+    
+    // Parse the JSON response from WASM
+    let response;
+    try {
+      response = JSON.parse(responseString);
+    } catch (parseError) {
+      throw new Error(`Failed to parse WASM response: ${responseString} (parse error: ${parseError.message})`);
+    }
 
     // Cache successful results
     if (response && response.success) {
