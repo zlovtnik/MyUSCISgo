@@ -68,18 +68,17 @@ export function CredentialForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Mark all fields as touched
+    // Validate all fields and collect errors
+    const clientIdError = validateClientId(clientId);
+    const clientSecretError = validateClientSecret(clientSecret);
+
+    // Set all state at once
     setTouched({
       clientId: true,
       clientSecret: true,
       environment: true
     });
-
-    // Validate all fields and collect errors
-    const clientIdError = validateClientId(clientId);
-    const clientSecretError = validateClientSecret(clientSecret);
-
-    // Set all errors at once
+    
     setErrors({
       clientId: clientIdError || undefined,
       clientSecret: clientSecretError || undefined,
@@ -131,7 +130,7 @@ export function CredentialForm({
           spellCheck="false"
         />
         {errors.clientId && (
-          <p className="mt-1 text-sm text-red-600" role="alert">
+          <p key={errors.clientId} className="mt-1 text-sm text-red-600" role="alert">
             {errors.clientId}
           </p>
         )}
