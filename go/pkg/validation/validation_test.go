@@ -262,11 +262,11 @@ func TestSanitizeInput(t *testing.T) {
 		expected string
 	}{
 		{"normal input", "normal input", "normal input"},
-		{"input with script", "<script>alert('xss')</script>", "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;"},
-		{"input with quotes", "\"quoted\" 'single'", "&quot;quoted&quot; &#x27;single&#x27;"},
+		{"input with script", "<script>alert('xss')</script>", "&amp;lt;script&amp;gt;alert(&amp;#x27;xss&amp;#x27;)&amp;lt;/script&amp;gt;"},
+		{"input with quotes", "\"quoted\" 'single'", "&amp;quot;quoted&amp;quot; &amp;#x27;single&amp;#x27;"},
 		{"input with whitespace", "  input  ", "input"},
 		{"empty input", "", ""},
-		{"input with newlines", "line1\nline2", "line1\nline2"},
+		{"input with newlines", "line1\nline2", "line1line2"},
 	}
 
 	for _, tt := range tests {

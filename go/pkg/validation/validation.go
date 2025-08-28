@@ -50,6 +50,9 @@ func ValidateClientID(clientID string) error {
 		return ValidationError{Field: "clientId", Message: "client ID cannot be empty"}
 	}
 
+	// Sanitize input first
+	clientID = SanitizeInput(clientID)
+
 	// Client ID should be alphanumeric with hyphens and underscores
 	matched, err := regexp.MatchString(`^[a-zA-Z0-9\-_]+$`, clientID)
 	if err != nil {
@@ -71,6 +74,9 @@ func ValidateClientSecret(clientSecret string) error {
 	if strings.TrimSpace(clientSecret) == "" {
 		return ValidationError{Field: "clientSecret", Message: "client secret cannot be empty"}
 	}
+
+	// Sanitize input first
+	clientSecret = SanitizeInput(clientSecret)
 
 	if len(clientSecret) < 8 {
 		return ValidationError{Field: "clientSecret", Message: "client secret must be at least 8 characters long"}
@@ -107,6 +113,15 @@ func SanitizeInput(input string) string {
 	input = strings.ReplaceAll(input, ">", "&gt;")
 	input = strings.ReplaceAll(input, "\"", "&quot;")
 	input = strings.ReplaceAll(input, "'", "&#x27;")
+	input = strings.ReplaceAll(input, "&", "&amp;")
+
+	// Remove potential JavaScript injection patterns
+	input = regexp.MustCompile(`javascript:`).ReplaceAllString(input, "")
+	input = regexp.MustCompile(`on\w+\s*=`).ReplaceAllString(input, "")
+	input = regexp.MustCompile(`<script[^>]*>.*?</script>`).ReplaceAllString(input, "")
+
+	// Remove null bytes and control characters
+	input = regexp.MustCompile(`[\x00-\x1F\x7F-\x9F]`).ReplaceAllString(input, "")
 
 	// Trim whitespace
 	return strings.TrimSpace(input)

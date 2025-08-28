@@ -27,19 +27,25 @@ export function CredentialForm({
       case 'clientId':
         if (!value.trim()) {
           newErrors.clientId = 'Client ID is required';
-        } else if (!validateClientId(value)) {
-          newErrors.clientId = 'Please enter a valid Client ID';
         } else {
-          delete newErrors.clientId;
+          const validationError = validateClientId(value);
+          if (validationError) {
+            newErrors.clientId = validationError;
+          } else {
+            delete newErrors.clientId;
+          }
         }
         break;
       case 'clientSecret':
         if (!value.trim()) {
           newErrors.clientSecret = 'Client Secret is required';
-        } else if (!validateClientSecret(value)) {
-          newErrors.clientSecret = 'Please enter a valid Client Secret';
         } else {
-          delete newErrors.clientSecret;
+          const validationError = validateClientSecret(value);
+          if (validationError) {
+            newErrors.clientSecret = validationError;
+          } else {
+            delete newErrors.clientSecret;
+          }
         }
         break;
     }
@@ -77,18 +83,29 @@ export function CredentialForm({
       environment: true
     });
 
-    // Validate all fields
-    validateField('clientId', clientId);
-    validateField('clientSecret', clientSecret);
+    // Validate all fields synchronously
+    const clientIdError = validateClientId(clientId);
+    const clientSecretError = validateClientSecret(clientSecret);
 
-    // Check if there are any errors
-    if (Object.keys(errors).length === 0 && clientId.trim() && clientSecret.trim()) {
-      onSubmit({
-        environment,
-        clientId: clientId.trim(),
-        clientSecret: clientSecret.trim()
-      });
-    }
+    const newErrors: FormErrors = {};
+    if (clientIdError) newErrors.clientId = clientIdError;
+    if (clientSecretError) newErrors.clientSecret = clientSecretError;
+
+    // Update errors state and check validation
+    setErrors((prevErrors) => {
+      const updatedErrors = { ...prevErrors, ...newErrors };
+      
+      // Check if there are any errors
+      if (Object.keys(updatedErrors).length === 0 && clientId.trim() && clientSecret.trim()) {
+        onSubmit({
+          environment,
+          clientId: clientId.trim(),
+          clientSecret: clientSecret.trim()
+        });
+      }
+      
+      return updatedErrors;
+    });
   };
 
   const isFormValid = clientId.trim() && clientSecret.trim() && Object.keys(errors).length === 0;
@@ -125,7 +142,7 @@ export function CredentialForm({
           autoComplete="off"
           spellCheck="false"
         />
-        {errors.clientId && touched.clientId && (
+        {errors.clientId && (
           <p className="mt-1 text-sm text-red-600" role="alert">
             {errors.clientId}
           </p>
@@ -155,7 +172,7 @@ export function CredentialForm({
           autoComplete="off"
           spellCheck="false"
         />
-        {errors.clientSecret && touched.clientSecret && (
+        {errors.clientSecret && (
           <p className="mt-1 text-sm text-red-600" role="alert">
             {errors.clientSecret}
           </p>
