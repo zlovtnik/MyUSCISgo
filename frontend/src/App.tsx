@@ -5,13 +5,12 @@ import './App.css';
 import type { Credentials, ProcessingResult } from './types';
 import { useWasm } from './hooks/useWasm';
 import { Menu } from './components/Menu';
+import type { Page } from './components/Menu';
 import { CredentialForm } from './components/forms/CredentialForm';
 import { ResultDisplay } from './components/ResultDisplay';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorBoundary } from './components/error/ErrorBoundary';
 import { TokenCertification } from './components/TokenCertification';
-
-type Page = 'credentials' | 'certification';
 
 function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('credentials');
@@ -27,15 +26,15 @@ function AppContent() {
 
     setIsProcessing(true);
     setResult(null);
-    console.log('Starting credential processing...');
+    if (process.env.NODE_ENV !== 'production') console.debug('Starting credential processing...');
 
     try {
       // Use the processCredentials function from the hook
       const response = await processCredentials(credentials);
-      console.log('WASM Response:', response);
+      if (process.env.NODE_ENV !== 'production') console.debug('WASM Response:', response);
 
       if (response.success && response.result) {
-        console.log('Setting result:', response.result);
+        if (process.env.NODE_ENV !== 'production') console.debug('Setting result:', response.result);
         setResult(response.result);
         toast.success('Credentials processed successfully!');
       } else {
@@ -111,7 +110,7 @@ function AppContent() {
   }
 
   const renderCurrentPage = () => {
-    console.log('Rendering page, current result:', result);
+    if (process.env.NODE_ENV !== 'production') console.debug('Rendering page, current result:', result);
     switch (currentPage) {
       case 'credentials':
         return (
