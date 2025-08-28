@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-type Page = 'credentials' | 'certification';
+export type Page = 'credentials' | 'certification';
 
 interface MenuProps {
   readonly currentPage: Page;
@@ -34,9 +34,12 @@ export function Menu({ currentPage, onPageChange }: MenuProps) {
     <>
       {/* Burger Menu Button */}
       <button
+        type="button"
         onClick={toggleMenu}
         className="fixed top-4 left-4 z-50 bg-black rounded-lg p-4 shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-600 hover:border-gray-400"
         aria-label="Toggle menu"
+        aria-expanded={isOpen}
+        aria-controls="app-menu-panel"
       >
         <div className="w-7 h-7 flex flex-col justify-center items-center">
           <span className={`block w-6 h-0.5 bg-white transition-all duration-300 ${isOpen ? 'rotate-45 translate-y-1.5' : '-translate-y-1'}`}></span>
@@ -48,6 +51,7 @@ export function Menu({ currentPage, onPageChange }: MenuProps) {
       {/* Overlay */}
       {isOpen && (
         <button
+          type="button"
           className="fixed inset-0 bg-black bg-opacity-50 z-40"
           onClick={() => setIsOpen(false)}
           onKeyDown={handleOverlayKeyDown}
@@ -57,11 +61,16 @@ export function Menu({ currentPage, onPageChange }: MenuProps) {
 
       {/* Menu Panel */}
       {isOpen && (
-        <div className="fixed top-0 left-0 h-full w-80 bg-white shadow-2xl z-50">
+        <dialog
+          id="app-menu-panel"
+          aria-modal="true"
+          className="fixed top-0 left-0 h-full w-80 bg-white shadow-2xl z-50 m-0"
+        >
           <div className="p-6">
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-xl font-bold text-gray-900">USCIS Tools</h2>
               <button
+                type="button"
                 onClick={() => setIsOpen(false)}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 aria-label="Close menu"
@@ -75,6 +84,7 @@ export function Menu({ currentPage, onPageChange }: MenuProps) {
             <nav className="space-y-2">
               {menuItems.map((item) => (
                 <button
+                  type="button"
                   key={item.id}
                   onClick={() => handleMenuItemClick(item.id)}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-all duration-200 ${
@@ -82,6 +92,7 @@ export function Menu({ currentPage, onPageChange }: MenuProps) {
                       ? 'bg-blue-50 text-blue-700 border border-blue-200'
                       : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                   }`}
+                  aria-current={currentPage === item.id ? 'page' : undefined}
                 >
                   <span className="text-sm">{item.icon}</span>
                   <span className="font-medium">{item.label}</span>
@@ -101,7 +112,7 @@ export function Menu({ currentPage, onPageChange }: MenuProps) {
               </div>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
     </>
   );
