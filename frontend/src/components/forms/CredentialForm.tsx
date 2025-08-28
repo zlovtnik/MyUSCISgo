@@ -24,33 +24,33 @@ export function CredentialForm({
     const newErrors = { ...errors };
 
     switch (field) {
-      case 'clientId':
-        if (!value.trim()) {
-          newErrors.clientId = 'Client ID is required';
+      case 'clientId': {
+        const clientIdError = validateClientId(value);
+        if (clientIdError) {
+          newErrors.clientId = clientIdError;
         } else {
-          const validationError = validateClientId(value);
-          if (validationError) {
-            newErrors.clientId = validationError;
-          } else {
-            delete newErrors.clientId;
-          }
+          delete newErrors.clientId;
         }
         break;
-      case 'clientSecret':
-        if (!value.trim()) {
-          newErrors.clientSecret = 'Client Secret is required';
+      }
+      case 'clientSecret': {
+        const clientSecretError = validateClientSecret(value);
+        if (clientSecretError) {
+          newErrors.clientSecret = clientSecretError;
         } else {
-          const validationError = validateClientSecret(value);
-          if (validationError) {
-            newErrors.clientSecret = validationError;
-          } else {
-            delete newErrors.clientSecret;
-          }
+          delete newErrors.clientSecret;
         }
         break;
+      }
     }
 
-    setErrors(newErrors);
+    // Filter out undefined values to ensure only actual errors are stored
+    const filteredErrors: FormErrors = {};
+    if (newErrors.clientId !== undefined) filteredErrors.clientId = newErrors.clientId;
+    if (newErrors.clientSecret !== undefined) filteredErrors.clientSecret = newErrors.clientSecret;
+    if (newErrors.environment !== undefined) filteredErrors.environment = newErrors.environment;
+    if (newErrors.general !== undefined) filteredErrors.general = newErrors.general;
+    setErrors(filteredErrors);
   };
 
   const handleFieldChange = (field: string, value: string) => {
@@ -76,39 +76,40 @@ export function CredentialForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Mark all fields as touched
+    // Validate all fields and collect errors
+    const clientIdError = validateClientId(clientId);
+    const clientSecretError = validateClientSecret(clientSecret);
+
+    // Set all state at once
     setTouched({
       clientId: true,
       clientSecret: true,
       environment: true
     });
+    
+    const nextErrors: FormErrors = {};
+    if (clientIdError) nextErrors.clientId = clientIdError;
+    if (clientSecretError) nextErrors.clientSecret = clientSecretError;
+    
+    // Filter out undefined values to ensure only actual errors are stored
+    const filteredErrors: FormErrors = {};
+    if (nextErrors.clientId !== undefined) filteredErrors.clientId = nextErrors.clientId;
+    if (nextErrors.clientSecret !== undefined) filteredErrors.clientSecret = nextErrors.clientSecret;
+    if (nextErrors.environment !== undefined) filteredErrors.environment = nextErrors.environment;
+    if (nextErrors.general !== undefined) filteredErrors.general = nextErrors.general;
+    setErrors(filteredErrors);
 
-    // Validate all fields synchronously
-    const clientIdError = validateClientId(clientId);
-    const clientSecretError = validateClientSecret(clientSecret);
-
-    const newErrors: FormErrors = {};
-    if (clientIdError) newErrors.clientId = clientIdError;
-    if (clientSecretError) newErrors.clientSecret = clientSecretError;
-
-    // Update errors state and check validation
-    setErrors((prevErrors) => {
-      const updatedErrors = { ...prevErrors, ...newErrors };
-      
-      // Check if there are any errors
-      if (Object.keys(updatedErrors).length === 0 && clientId.trim() && clientSecret.trim()) {
-        onSubmit({
-          environment,
-          clientId: clientId.trim(),
-          clientSecret: clientSecret.trim()
-        });
-      }
-      
-      return updatedErrors;
-    });
+    // Check if there are any errors
+    if (!clientIdError && !clientSecretError && clientId.trim() && clientSecret.trim()) {
+      onSubmit({
+        environment,
+        clientId: clientId.trim(),
+        clientSecret: clientSecret.trim()
+      });
+    }
   };
 
-  const isFormValid = clientId.trim() && clientSecret.trim() && Object.keys(errors).length === 0;
+  const isFormValid: boolean = Boolean(clientId.trim()) && Boolean(clientSecret.trim()) && Object.values(errors || {}).every(v => !v);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -143,7 +144,7 @@ export function CredentialForm({
           spellCheck="false"
         />
         {errors.clientId && (
-          <p className="mt-1 text-sm text-red-600" role="alert">
+          <p key={errors.clientId} className="mt-1 text-sm text-red-600" role="alert">
             {errors.clientId}
           </p>
         )}
@@ -173,7 +174,7 @@ export function CredentialForm({
           spellCheck="false"
         />
         {errors.clientSecret && (
-          <p className="mt-1 text-sm text-red-600" role="alert">
+          <p key={errors.clientSecret} className="mt-1 text-sm text-red-600" role="alert">
             {errors.clientSecret}
           </p>
         )}

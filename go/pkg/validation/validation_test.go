@@ -178,10 +178,11 @@ func TestValidateClientID(t *testing.T) {
 	}{
 		{"valid client ID", "test-client-123", false, ""},
 		{"valid client ID with underscores", "test_client_123", false, ""},
+		{"valid client ID with dash and underscore", "test-client_123", false, ""},
 		{"valid alphanumeric", "TestClient123", false, ""},
 		{"empty client ID", "", true, "client ID cannot be empty"},
-		{"client ID with spaces", "test client", true, "must contain only alphanumeric characters"},
-		{"client ID with special chars", "test@client", true, "must contain only alphanumeric characters"},
+		{"client ID with spaces", "test client", true, "must contain only alphanumeric characters, underscores, or dashes"},
+		{"client ID with special chars", "test@client", true, "must contain only alphanumeric characters, underscores, or dashes"},
 		{"too short", "ab", true, "must be between 3 and 100 characters"},
 		{"too long", strings.Repeat("a", 101), true, "must be between 3 and 100 characters"},
 	}
@@ -256,24 +257,126 @@ func TestValidateEnvironment(t *testing.T) {
 }
 
 func TestSanitizeInput(t *testing.T) {
+	const jsPayload = "javascript:alert('xss')"
 	tests := []struct {
 		name     string
 		input    string
 		expected string
 	}{
 		{"normal input", "normal input", "normal input"},
-		{"input with script", "<script>alert('xss')</script>", "&amp;lt;script&amp;gt;alert(&amp;#x27;xss&amp;#x27;)&amp;lt;/script&amp;gt;"},
-		{"input with quotes", "\"quoted\" 'single'", "&amp;quot;quoted&amp;quot; &amp;#x27;single&amp;#x27;"},
+		{"input with script", "<script>alert('xss')</script>", ""},
+		{"input with quotes", "\"quoted\" 'single'", "&#34;quoted&#34; &#39;single&#39;"},
 		{"input with whitespace", "  input  ", "input"},
 		{"empty input", "", ""},
 		{"input with newlines", "line1\nline2", "line1line2"},
+		{"mixed case javascript protocol", jsPayload, ""},
+		{"JavaScript protocol uppercase", "JavaScript:alert('xss')", ""},
+		{"multiline script tag", "<SCRIPT>\nalert('xss');\n</SCRIPT>", ""},
+		{"multiline script with content", "<script>\n  alert('xss');\n  console.log('test');\n</script>", ""},
+		{"onClick attribute", "<div onClick=\"alert('xss')\"></div>", "&lt;div&gt;&lt;/div&gt;"},
+		{"onmouseover attribute", "<img onMouseOver=\"alert('xss')\" />", "&lt;img /&gt;"},
+		{"javascript in href", "<a href=\"javascript:alert('xss')\">link</a>", "&lt;a href=&#34;&gt;link&lt;/a&gt;"},
+		{"vbscript protocol", "vbscript:msgbox('xss')", ""},
+		{"data URI", "data:text/html,<script>alert('xss')</script>", "&gt;alert(&#39;xss&#39;)&lt;/script&gt;"},
+		{"multiple event handlers", "<div onClick=\"alert(1)\" onMouseOver=\"alert(2)\">test</div>", "&lt;div&gt;test&lt;/div&gt;"},
+		{"javascript with single quotes", "javascript:alert('xss')", ""},
+		{"javascript with double quotes", "javascript:alert(\"xss\")", ""},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := SanitizeInput(tt.input)
 			if result != tt.expected {
-				t.Errorf("SanitizeInput() = %v, want %v", result, tt.expected)
+				t.Errorf("SanitizeInput() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSanitizeInputDangerousContentRemoval(t *testing.T) {
+	const jsPayload = "javascript:alert('xss')"
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "javascript URI complete removal",
+			input:    jsPayload,
+			expected: "",
+		},
+		{
+			name:     "javascript URI in href attribute",
+			input:    `<a href="` + jsPayload + `">Click me</a>`,
+			expected: `&lt;a href=&#34;&gt;Click me&lt;/a&gt;`,
+		},
+		{
+			name:     "javascript URI with complex payload",
+			input:    "javascript:(function(){alert('xss');return false;})()",
+			expected: "false;})()",
+		},
+		{
+			name:     "vbscript URI removal",
+			input:    "vbscript:msgbox('xss')",
+			expected: "",
+		},
+		{
+			name:     "data URI removal",
+			input:    "data:text/html,<script>alert('xss')</script>",
+			expected: "&gt;alert(&#39;xss&#39;)&lt;/script&gt;",
+		},
+		{
+			name:     "file URI removal",
+			input:    "file:///etc/passwd",
+			expected: "",
+		},
+		{
+			name:     "ftp URI removal",
+			input:    "ftp://evil.com/malware.exe",
+			expected: "",
+		},
+		{
+			name:     "onClick event handler removal",
+			input:    `<button onClick="alert('xss')">Click</button>`,
+			expected: `&lt;button&gt;Click&lt;/button&gt;`,
+		},
+		{
+			name:     "onMouseOver event handler removal",
+			input:    `<img onMouseOver="alert('xss')" src="image.jpg" />`,
+			expected: `&lt;img src=&#34;image.jpg&#34; /&gt;`,
+		},
+		{
+			name:     "multiple event handlers removal",
+			input:    `<div onClick="alert(1)" onMouseOver="alert(2)" onLoad="alert(3)">test</div>`,
+			expected: `&lt;div&gt;test&lt;/div&gt;`,
+		},
+		{
+			name:     "event handler with single quotes",
+			input:    `<a onClick='alert("xss")'>link</a>`,
+			expected: `&lt;a&gt;link&lt;/a&gt;`,
+		},
+		{
+			name:     "event handler without quotes",
+			input:    `<div onClick=alert('xss')>test</div>`,
+			expected: `&lt;div&gt;test&lt;/div&gt;`,
+		},
+		{
+			name:     "mixed dangerous content",
+			input:    `<a href="` + jsPayload + `" onClick="alert('xss')">link</a>`,
+			expected: `&lt;a href=&#34;&gt;link&lt;/a&gt;`,
+		},
+		{
+			name:     "safe content should remain",
+			input:    `<a href="https://example.com">safe link</a>`,
+			expected: `&lt;a href=&#34;https://example.com&#34;&gt;safe link&lt;/a&gt;`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := SanitizeInput(tt.input)
+			if result != tt.expected {
+				t.Errorf("SanitizeInput() = %q, want %q", result, tt.expected)
 			}
 		})
 	}

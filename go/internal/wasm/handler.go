@@ -18,6 +18,7 @@ import (
 )
 
 const (
+	// ProcessingTimeoutMsg is the error message for processing timeouts
 	ProcessingTimeoutMsg = "Processing timeout"
 )
 
@@ -53,7 +54,7 @@ func (h *Handler) ProcessCredentialsAsync(this js.Value, args []js.Value) any {
 	if len(args) != 1 {
 		err := fmt.Errorf("invalid number of arguments: expected 1, got %d", len(args))
 		h.logger.Error("Invalid arguments", err)
-		return h.createErrorResponse(err.Error())
+		return js.Global().Get("Promise").Call("reject", h.createErrorResponse(err.Error()))
 	}
 
 	// Parse JSON input
@@ -65,7 +66,8 @@ func (h *Handler) ProcessCredentialsAsync(this js.Value, args []js.Value) any {
 	var creds types.Credentials
 	if err := json.Unmarshal([]byte(credJSON), &creds); err != nil {
 		h.logger.Error("Failed to parse credentials JSON", err)
-		return h.createErrorResponse(fmt.Sprintf("Failed to parse credentials: %v", err))
+		return js.Global().Get("Promise").Call("reject",
+			h.createErrorResponse(fmt.Sprintf("Failed to parse credentials: %v", err)))
 	}
 
 	// Validate credentials
@@ -74,16 +76,18 @@ func (h *Handler) ProcessCredentialsAsync(this js.Value, args []js.Value) any {
 			"clientId":    creds.ClientID,
 			"environment": creds.Environment,
 		}))
-		return h.createErrorResponse(err.Error())
+		return js.Global().Get("Promise").Call("reject", h.createErrorResponse(err.Error()))
 	}
 
-	// Rate limiting check
-	clientIP := "unknown" // In a real implementation, you'd get this from the request context
-	if !h.rateLimiter.Allow(clientIP) {
+	// Rate limiting check - use client identifier derived from validated credentials
+	rateLimitKey := fmt.Sprintf("%s:%s", creds.Environment, creds.ClientID)
+	if !h.rateLimiter.Allow(rateLimitKey) {
 		h.logger.Warn("Rate limit exceeded", map[string]interface{}{
-			"clientIP": clientIP,
+			"rateLimitKey": rateLimitKey,
+			"clientId":     creds.ClientID,
+			"environment":  creds.Environment,
 		})
-		return h.createErrorResponse("Rate limit exceeded. Please try again later.")
+		return js.Global().Get("Promise").Call("reject", h.createErrorResponse("Rate limit exceeded. Please try again later."))
 	}
 
 	h.logger.Info("Credentials validated successfully", map[string]interface{}{
@@ -136,7 +140,7 @@ func (h *Handler) ProcessCredentialsAsync(this js.Value, args []js.Value) any {
 				"environment": creds.Environment,
 				"error":       ProcessingTimeoutMsg,
 			})
-			h.logger.Error("Processing timeout", err, map[string]interface{}{
+			h.logger.Error(ProcessingTimeoutMsg, err, map[string]interface{}{
 				"clientId":    creds.ClientID,
 				"environment": creds.Environment,
 			})
@@ -253,18 +257,62 @@ func (h *Handler) SendRealtimeUpdate(this js.Value, args []js.Value) any {
 	messageType := args[0].String()
 	data := args[1]
 
+	// Handle JavaScript data based on its type
+	var processedData interface{}
+	var logDataStr string
+
+	// Check if data is a JavaScript primitive
+	dataType := data.Type()
+	switch dataType {
+	case js.TypeString:
+		// Handle string primitive
+		processedData = data.String()
+		logDataStr = data.String()
+	case js.TypeNumber:
+		// Handle number primitive
+		processedData = data.Float()
+		logDataStr = fmt.Sprintf("%g", data.Float())
+	case js.TypeBoolean:
+		// Handle boolean primitive
+		processedData = data.Bool()
+		logDataStr = fmt.Sprintf("%t", data.Bool())
+	case js.TypeNull, js.TypeUndefined:
+		// Handle null/undefined
+		processedData = nil
+		logDataStr = "null"
+	default:
+		// Handle objects/arrays - use JSON.stringify and unmarshal
+		jsonStringify := js.Global().Get("JSON").Get("stringify")
+		jsonDataStr := jsonStringify.Invoke(data).String()
+
+		// Try to unmarshal into a Go interface{} to preserve structure
+		var unmarshaled interface{}
+		if err := json.Unmarshal([]byte(jsonDataStr), &unmarshaled); err != nil {
+			h.logger.Warn("Failed to unmarshal JSON data, using raw string", map[string]interface{}{
+				"error":      err.Error(),
+				"jsonString": jsonDataStr,
+			})
+			// Fallback: store as string if unmarshaling fails
+			processedData = jsonDataStr
+			logDataStr = jsonDataStr
+		} else {
+			processedData = unmarshaled
+			logDataStr = jsonDataStr
+		}
+	}
+
 	h.logger.Debug("Sending realtime update", map[string]interface{}{
 		"messageType": messageType,
-		"data":        data.String(),
+		"data":        logDataStr, // Use properly processed data for logging
 	})
 
 	// Call JavaScript callback if available
 	jsCallback := js.Global().Get("onRealtimeUpdate")
 	if !jsCallback.IsUndefined() && jsCallback.Type() == js.TypeFunction {
-		// Create update object
+		// Create update object with properly processed data
 		update := map[string]interface{}{
 			"type":      messageType,
-			"data":      data,
+			"data":      processedData, // Use processed data (primitives or unmarshaled objects)
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
 		}
 

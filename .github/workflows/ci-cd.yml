@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -39,7 +43,7 @@ jobs:
     - name: Run Go tests
       run: |
         cd go
-        go test ./... -v -coverprofile=coverage.out
+        go test ./... -v -race -coverprofile=coverage.out
         go tool cover -html=coverage.out -o coverage.html
 
     - name: Upload Go coverage reports
@@ -68,6 +72,14 @@ jobs:
       run: |
         cd frontend
         npm run test:e2e
+
+    - name: Upload Playwright report (on failure)
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-report
+        path: frontend/playwright-report/
+        retention-days: 7
 
     - name: Upload frontend coverage reports
       uses: codecov/codecov-action@v4
@@ -108,7 +120,7 @@ jobs:
         go-version: '1.25'
 
     - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@0.29.0
       with:
         scan-type: 'fs'
         scan-ref: '.'
@@ -116,16 +128,16 @@ jobs:
         output: 'trivy-results.sarif'
 
     - name: Upload Trivy scan results
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: 'trivy-results.sarif'
+        category: trivy
 
     - name: Run Go security scan
-      run: |
-        cd go
-        go install golang.org/x/vuln/cmd/govulncheck@latest
-        govulncheck ./...
+      uses: golang/govulncheck-action@v1
+      with:
+        go-version-file: go/go.mod
 
   build-and-push:
     name: Build and Push Docker Image
@@ -159,10 +171,14 @@ jobs:
           type=raw,value=latest,enable={{is_default_branch}}
 
     - name: Build and push Docker image
-      run: |
-        echo "Building Docker image..."
-        docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest .
-        echo "Docker image built successfully"
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+        cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
 
   deploy:
     name: Deploy to Production

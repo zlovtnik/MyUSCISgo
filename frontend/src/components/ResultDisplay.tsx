@@ -67,7 +67,7 @@ export function ResultDisplay({ result, onReset }: ResultDisplayProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg border border-gray-200">
+    <div className="bg-white rounded-lg shadow-lg border border-gray-200" data-testid="result">
       <div className="border-b border-gray-200">
         <div className="flex items-center justify-between p-4">
           <h3 className="text-lg font-semibold text-gray-900">

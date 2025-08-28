@@ -93,3 +93,7 @@ jspm_packages/
 
 # DynamoDB Local files
 .dynamodb/
+
+#playwright
+.playwright/
+frontend/playwright-report/index.html

@@ -18,7 +18,7 @@ export function LoadingSpinner({
   };
 
   return (
-    <div className={cn('flex flex-col items-center justify-center space-y-3', className)}>
+    <div className={cn('flex flex-col items-center justify-center space-y-3', className)} data-testid="processing-indicator">
       <svg
         className={cn(
           'animate-spin text-blue-600',
