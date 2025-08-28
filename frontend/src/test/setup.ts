@@ -10,7 +10,7 @@ const mockWorker = class Worker {
     this.url = url;
   }
 
-  postMessage(_: any) {
+  postMessage() {
     // Mock implementation - in real tests you might want to simulate responses
     setTimeout(() => {
       if (this.onmessage) {
