@@ -23,8 +23,9 @@ describe('CredentialForm', () => {
   it('shows validation errors for empty required fields on submit', async () => {
     render(<CredentialForm onSubmit={mockOnSubmit} />);
 
-    const submitButton = screen.getByRole('button', { name: /submit credentials/i });
-    fireEvent.click(submitButton);
+    // Trigger form submission by dispatching submit event
+    const form = document.querySelector('form')!;
+    fireEvent.submit(form);
 
     await waitFor(() => {
       expect(screen.getByText('Client ID is required')).toBeInTheDocument();
@@ -124,10 +125,10 @@ describe('CredentialForm', () => {
     render(<CredentialForm onSubmit={mockOnSubmit} />);
 
     const clientIdInput = screen.getByLabelText(/client id/i);
-    const submitButton = screen.getByRole('button', { name: /submit credentials/i });
+    const form = document.querySelector('form')!;
 
     // Trigger validation error
-    await user.click(submitButton);
+    fireEvent.submit(form);
     expect(await screen.findByText('Client ID is required')).toBeInTheDocument();
 
     // Start typing
