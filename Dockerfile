@@ -1,5 +1,6 @@
 # Multi-stage build for Go WASM and React frontend
-FROM golang:1.25-alpine AS go-builder
+ARG GO_VERSION=1.25
+FROM golang:${GO_VERSION}-alpine AS go-builder
 
 # Install git and ca-certificates (needed for go modules)
 RUN apk add --no-cache git ca-certificates
@@ -7,9 +8,9 @@ RUN apk add --no-cache git ca-certificates
 # Set working directory
 WORKDIR /app/go
 
-# Copy go mod and sum files (go.sum may not exist if no external deps)
+# Copy go mod and sum files
 COPY go/go.mod ./
-COPY go/go.sum* ./
+COPY go/go.sum ./
 
 # Download dependencies
 RUN go mod download
@@ -48,7 +49,7 @@ RUN npm run build
 FROM nginx:alpine
 
 # Install security updates
-RUN apk update && apk upgrade && apk add --no-cache curl
+RUN apk add --no-cache curl
 
 # Copy custom nginx configuration
 COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
@@ -60,18 +61,7 @@ COPY --from=react-builder /app/frontend/dist /usr/share/nginx/html
 COPY --from=go-builder /app/main.wasm /usr/share/nginx/html/
 COPY --from=go-builder /app/wasm_exec.js /usr/share/nginx/html/
 
-# Create non-root user and set permissions
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nextjs -u 1001 && \
-    chown -R nextjs:nodejs /usr/share/nginx/html && \
-    chown -R nextjs:nodejs /var/cache/nginx && \
-    chown -R nextjs:nodejs /var/log/nginx && \
-    chown -R nextjs:nodejs /etc/nginx/conf.d && \
-    touch /var/run/nginx.pid && \
-    chown -R nextjs:nodejs /var/run/nginx.pid
-
-# Switch to non-root user
-USER nextjs
+# (Optional hardening: use 8080 or setcap cap_net_bind_service; otherwise run as root for :80)
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
