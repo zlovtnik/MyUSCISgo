@@ -34,19 +34,28 @@ function cleanCache() {
 
 // Generate cache key from credentials
 function generateCacheKey(credentials) {
-  // Create a simple hash of the credentials for caching
-  const str = JSON.stringify(credentials);
+  // Strip secrets; only hash non-sensitive fields
+  const { clientSecret, token, ...safe } = credentials || {};
+  const str = JSON.stringify(safe);
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
+    hash |= 0; // force 32-bit
   }
   return hash.toString();
 }
 
+// Check if we should cache based on credentials
+function shouldCache(credentials) {
+  if (!credentials) return false;
+  if ('clientSecret' in credentials || 'token' in credentials) return false;
+  return credentials.environment !== 'production';
+}
+
 // Get cached result if available
 function getCachedResult(credentials) {
+  if (!shouldCache(credentials)) return null;
   const key = generateCacheKey(credentials);
   const entry = cache.get(key);
 
@@ -63,6 +72,7 @@ function getCachedResult(credentials) {
 
 // Cache result
 function cacheResult(credentials, result) {
+  if (!shouldCache(credentials)) return;
   cleanCache(); // Clean expired entries
 
   if (cache.size >= CACHE_SIZE_LIMIT) {
@@ -86,11 +96,15 @@ async function initializeWASM() {
     }
 
     const go = new self.Go();
-    const result = await WebAssembly.instantiateStreaming(
-      fetch('/main.wasm'),
-      go.importObject
-    );
-    go.run(result.instance);
+    let wasm;
+    try {
+      wasm = await WebAssembly.instantiateStreaming(fetch('/main.wasm'), go.importObject);
+    } catch (e) {
+      const resp = await fetch('/main.wasm');
+      const buf = await resp.arrayBuffer();
+      wasm = await WebAssembly.instantiate(buf, go.importObject);
+    }
+    go.run(wasm.instance);
 
     wasmInstance = self.goProcessCredentials;
     wasmCertifyInstance = self.goCertifyToken;
