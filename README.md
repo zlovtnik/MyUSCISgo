@@ -2,27 +2,12 @@
 
 ## Project Overview
 
-This project delivers a robust WebAssembly (WASM) application with Go handling backend logic compiled to WASM and React p    WASM_WORKER --> WASM_HANDLER
-    WASM_HANDLER --> MAIN
-
-    WASM_HANDLER --> PROCESSOR_PKG
-    WASM_HANDLER --> VALIDATION_PKG
-    WASM_HANDLER --> LOGGING_PKG
-    WASM_HANDLER --> RATE_LIMIT_PKG
-
-    PROCESSOR_PKG --> TYPES_PKG
-    PROCESSOR_PKG --> SECURITY_PKG
-    VALIDATION_PKG --> TYPES_PKG
-    LOGGING_PKG --> TRACKER_PKG
-    RATE_LIMIT_PKG --> TRACKER_PKG
-
-    CREDENTIAL_FORM --> WASM_HOOK
-    ENV_SELECTOR --> WASM_HOOK
-    RESULT_DISPLAY --> WASM_HOOK
-
-    APP --> TOAST_SYSTEM
-    CREDENTIAL_FORM --> FORM_VALIDATION
-    RESULT_DISPLAY --> JSON_VIEWERtive frontend. The app securely transmits three essential variables (client ID, client secret, and environment) from the React UI into the Go WASM module for processing. Enhancements focus on improved security, advanced error handling, asynchronous processing, and optimized performance. The integration with Nginx ensures efficient serving of static files in production, resulting in a scalable, secure, and easy-to-deploy solution.
+This project delivers a robust WebAssembly (WASM) application with Go handling backend logic
+(compiled to WASM) and a reactive React frontend. The app securely transmits three essential
+variables (client ID, client secret, and environment) from the React UI into the Go WASM module
+for processing. Enhancements focus on improved security, advanced error handling, asynchronous
+processing, and optimized performance. The integration with Nginx ensures efficient serving of
+static files in production, resulting in a scalable, secure, and easy-to-deploy solution.
 
 ## Architecture
 
