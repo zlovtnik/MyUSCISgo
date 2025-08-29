@@ -12,9 +12,257 @@ body {
   --focus-ring: rgba(60, 59, 110, 0.1);
 }
 
+/* Accessibility and responsive design enhancements */
 @media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; }
-  button:hover { transform: none; box-shadow: none; }
+  * { 
+    transition: none !important; 
+    animation: none !important;
+  }
+  button:hover { 
+    transform: none; 
+    box-shadow: none; 
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --brand-navy: #000000;
+    --brand-red: #CC0000;
+    --focus-ring: rgba(0, 0, 0, 0.3);
+  }
+  
+  .bg-gray-50 {
+    background-color: #ffffff !important;
+    border: 1px solid #000000 !important;
+  }
+  
+  .text-gray-600 {
+    color: #000000 !important;
+  }
+  
+  .border-gray-200 {
+    border-color: #000000 !important;
+  }
+}
+
+/* Focus management for better keyboard navigation */
+*:focus {
+  outline: 2px solid var(--brand-navy);
+  outline-offset: 2px;
+}
+
+button:focus,
+input:focus,
+select:focus,
+textarea:focus,
+[tabindex]:focus {
+  outline: 2px solid var(--brand-navy);
+  outline-offset: 2px;
+}
+
+/* Skip link for screen readers */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: var(--brand-navy);
+  color: white;
+  padding: 8px;
+  text-decoration: none;
+  border-radius: 4px;
+  z-index: 1000;
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
+/* Improved responsive breakpoints */
+@media (max-width: 640px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  /* Stack elements vertically on small screens */
+  .flex-responsive {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  /* Adjust text sizes for mobile */
+  .text-responsive {
+    font-size: 0.875rem;
+  }
+  
+  /* Improve touch targets */
+  button, 
+  [role="button"],
+  input,
+  select {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Adjust grid layouts for tablets */
+  .grid-responsive {
+    grid-template-columns: 1fr;
+  }
+  
+  /* Improve spacing on medium screens */
+  .space-responsive > * + * {
+    margin-top: 1rem;
+  }
+}
+
+/* Screen reader only content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Hide scrollbars while maintaining functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Improved button states for accessibility */
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--brand-navy);
+  outline-offset: 2px;
+}
+
+/* Better color contrast for links */
+a {
+  color: var(--brand-navy);
+  text-decoration: underline;
+}
+
+a:hover,
+a:focus {
+  color: var(--brand-red);
+  text-decoration: none;
+}
+
+/* Improved form accessibility */
+label {
+  cursor: pointer;
+}
+
+input:invalid {
+  border-color: var(--brand-red);
+  box-shadow: 0 0 0 1px var(--brand-red);
+}
+
+input:valid {
+  border-color: #10B981;
+}
+
+/* Loading states with better accessibility */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin {
+    animation: none;
+  }
+}
+
+/* Better focus indicators for custom components */
+[role="tab"]:focus,
+[role="button"]:focus,
+[role="menuitem"]:focus {
+  outline: 2px solid var(--brand-navy);
+  outline-offset: 2px;
+  background-color: var(--focus-ring);
+}
+
+/* Improved table accessibility */
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th, td {
+  text-align: left;
+  padding: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+th {
+  font-weight: 600;
+  background-color: #f9fafb;
+}
+
+/* Better error and success states */
+.error-state {
+  border-color: var(--brand-red);
+  background-color: #fef2f2;
+  color: #991b1b;
+}
+
+.success-state {
+  border-color: #10b981;
+  background-color: #f0fdf4;
+  color: #065f46;
+}
+
+/* Responsive typography */
+@media (max-width: 640px) {
+  h1 { font-size: 1.875rem; }
+  h2 { font-size: 1.5rem; }
+  h3 { font-size: 1.25rem; }
+  h4 { font-size: 1.125rem; }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  * {
+    background: white !important;
+    color: black !important;
+  }
+  
+  a {
+    text-decoration: underline;
+  }
+  
+  button {
+    border: 1px solid black;
+    background: white;
+    color: black;
+  }
 }
 
 .App {
@@ -52,7 +300,7 @@ label {
     display: block;
     margin-bottom: 8px;
     font-weight: 600;
-    color: #3C3B6E;
+    color: var(--brand-navy);
     font-size: 14px;
 }
 

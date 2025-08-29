@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
-import type { Credentials, ProcessingResult } from './types';
+import { animations, presets } from './utils/animations';
+import type { Credentials, ProcessingResult, Environment, ProcessingStep } from './types';
 import { useWasm } from './hooks/useWasm';
 import { Menu } from './components/Menu';
 import type { Page } from './components/Menu';
@@ -11,11 +12,17 @@ import { ResultDisplay } from './components/ResultDisplay';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorBoundary } from './components/error/ErrorBoundary';
 import { TokenCertification } from './components/TokenCertification';
+import { ProcessingIndicator } from './components/ProcessingIndicator';
+import { RealtimeUpdatesDisplay } from './components/RealtimeUpdatesDisplay';
+import { EnvironmentIndicator } from './components/EnvironmentIndicator';
 
 function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('credentials');
   const [result, setResult] = useState<ProcessingResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentEnvironment, setCurrentEnvironment] = useState<Environment>('development');
+  const [currentStep, setCurrentStep] = useState<ProcessingStep>('validating');
+  const [processingProgress, setProcessingProgress] = useState(0);
   const { isLoaded, error: wasmError, processCredentials, realtimeUpdates, clearRealtimeUpdates } = useWasm();
 
   const handleCredentialsSubmit = async (credentials: Credentials) => {
@@ -24,19 +31,66 @@ function AppContent() {
       return;
     }
 
+    // Store the current environment for use in ResultDisplay
+    setCurrentEnvironment(credentials.environment);
     setIsProcessing(true);
     setResult(null);
+    setCurrentStep('validating');
+    setProcessingProgress(0);
+    
     if (process.env.NODE_ENV !== 'production') console.debug('Starting credential processing...');
 
     try {
+      // Simulate progress tracking through processing steps
+      const steps: ProcessingStep[] = ['validating', 'authenticating', 'fetching-case-data', 'processing-results'];
+      
+      for (let i = 0; i < steps.length; i++) {
+        setCurrentStep(steps[i]);
+        setProcessingProgress(Math.round((i / steps.length) * 80)); // Leave 20% for completion
+        
+        // Small delay to show progress (in real implementation, this would be driven by WASM updates)
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
       // Use the processCredentials function from the hook
       const response = await processCredentials(credentials);
       if (process.env.NODE_ENV !== 'production') console.debug('WASM Response:', response);
 
       if (response.success && response.result) {
-        if (process.env.NODE_ENV !== 'production') console.debug('Setting result:', response.result);
-        setResult(response.result);
-        toast.success('Credentials processed successfully!');
+        setCurrentStep('complete');
+        setProcessingProgress(100);
+        
+        // Validate the enhanced data structures
+        const result = response.result;
+        if (process.env.NODE_ENV !== 'production') {
+          console.debug('Setting result:', result);
+          
+          // Log enhanced data if available
+          if (result.caseDetails) {
+            console.debug('Case Details:', result.caseDetails);
+          }
+          if (result.oauthToken) {
+            console.debug('OAuth Token received (masked):', {
+              tokenType: result.oauthToken.tokenType,
+              expiresIn: result.oauthToken.expiresIn,
+              scope: result.oauthToken.scope
+            });
+          }
+          if (result.processingMetadata) {
+            console.debug('Processing Metadata:', result.processingMetadata);
+          }
+        }
+        
+        setResult(result);
+        
+        // Enhanced success message based on available data
+        let successMessage = 'Credentials processed successfully!';
+        if (result.caseDetails) {
+          successMessage += ` Case status: ${result.caseDetails.currentStatus}`;
+        }
+        toast.success(successMessage);
       } else {
         const errorMessage = response.error || 'Unknown error occurred';
         console.error('Processing failed:', errorMessage);
@@ -48,22 +102,54 @@ function AppContent() {
       toast.error(`Unexpected error: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
+      // Reset progress after a short delay to show completion
+      setTimeout(() => {
+        setProcessingProgress(0);
+        setCurrentStep('validating');
+      }, 2000);
     }
   };
 
   const handleReset = () => {
     setResult(null);
+    setCurrentEnvironment('development'); // Reset to default environment
+    setProcessingProgress(0);
+    setCurrentStep('validating');
+    setIsProcessing(false); // Ensure processing state is reset
+    clearRealtimeUpdates();
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('App state reset - ready for new request');
+    }
+    
     toast.info('Form reset. Ready for new request.');
+  };
+
+  const handleCancelProcessing = () => {
+    setIsProcessing(false);
+    setProcessingProgress(0);
+    setCurrentStep('validating');
+    toast.info('Processing cancelled.');
   };
 
   const handlePageChange = (page: Page) => {
     setCurrentPage(page);
     setResult(null);
+    setIsProcessing(false); // Stop any ongoing processing
+    setProcessingProgress(0);
+    setCurrentStep('validating');
     clearRealtimeUpdates();
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug(`Page changed to: ${page}`);
+    }
   };
 
-  // Show WASM loading error
+  // Show WASM loading error with enhanced error handling
   if (wasmError) {
+    const errorMessage = wasmError instanceof Error ? wasmError.message : String(wasmError);
+    const isRetryable = wasmError instanceof Error && 'retryable' in wasmError && (wasmError as any).retryable;
+    
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6 text-center">
@@ -76,14 +162,35 @@ function AppContent() {
             Failed to Load WASM Module
           </h2>
           <p className="text-gray-600 mb-4">
-            {wasmError}
+            {errorMessage}
           </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-          >
-            Reload Page
-          </button>
+          <div className="space-y-2">
+            {isRetryable && (
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              >
+                Retry Loading
+              </button>
+            )}
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+            >
+              Reload Page
+            </button>
+          </div>
+          
+          {/* Actionable guidance */}
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-left">
+            <h3 className="text-sm font-medium text-blue-800 mb-1">What you can try:</h3>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li>• Check your internet connection</li>
+              <li>• Disable browser extensions</li>
+              <li>• Try a different browser</li>
+              <li>• Contact support if the problem persists</li>
+            </ul>
+          </div>
         </div>
         <ToastContainer />
       </div>
@@ -122,16 +229,26 @@ function AppContent() {
                   <h1 className="text-3xl font-bold text-gray-900 mb-2">
                     USCIS Credential Processor
                   </h1>
-                  <p className="text-gray-600">
+                  <p className="text-gray-600 mb-4">
                     Securely process your USCIS API credentials using WebAssembly
                   </p>
+                  
+                  {/* Environment Indicator */}
+                  <div className="flex justify-center">
+                    <EnvironmentIndicator
+                      environment={currentEnvironment}
+                      processingMetadata={result?.processingMetadata}
+                      showDebugInfo={currentEnvironment === 'development'}
+                      className="text-left"
+                    />
+                  </div>
                 </div>
 
                 {/* Main Content */}
                 <div className="space-y-8">
                   {!result ? (
                     /* Credential Form */
-                    <div className="bg-white rounded-lg shadow-lg p-6">
+                    <div className={`bg-white rounded-lg shadow-lg p-6 ${animations.fadeIn} ${presets.card.hover}`}>
                       <h2 className="text-xl font-semibold text-gray-900 mb-6">
                         Enter Your Credentials
                       </h2>
@@ -143,61 +260,36 @@ function AppContent() {
                     </div>
                   ) : (
                     /* Results Display */
-                    <div>
+                    <div className={animations.slideInFromBottom}>
                       <ResultDisplay
                         result={result}
                         onReset={handleReset}
+                        environment={currentEnvironment}
                       />
                     </div>
                   )}
 
-                  {/* Processing Indicator */}
+                  {/* Enhanced Processing Indicator */}
                   {isProcessing && (
-                    <div className="bg-white rounded-lg shadow-lg p-6">
-                      <div className="text-center">
-                        <LoadingSpinner
-                          size="lg"
-                          message="Processing your credentials..."
-                          className="mb-4"
-                        />
-                        <p className="text-gray-600">
-                          Please wait while we securely process your information...
-                        </p>
-                      </div>
+                    <div className={`bg-white rounded-lg shadow-lg p-6 mb-6 ${animations.slideInFromTop} ${presets.card.hover}`}>
+                      <ProcessingIndicator
+                        isProcessing={isProcessing}
+                        currentStep={currentStep}
+                        progress={processingProgress}
+                        realtimeUpdates={realtimeUpdates}
+                        onCancel={handleCancelProcessing}
+                      />
                     </div>
                   )}
 
-                  {/* Realtime Updates */}
+                  {/* Enhanced Realtime Updates Display */}
                   {realtimeUpdates.length > 0 && (
-                    <div className="bg-white rounded-lg shadow-lg p-6">
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          Real-time Updates
-                        </h3>
-                        <button
-                          onClick={clearRealtimeUpdates}
-                          className="text-sm text-blue-600 hover:text-blue-800"
-                        >
-                          Clear
-                        </button>
-                      </div>
-                      <div className="space-y-2 max-h-60 overflow-y-auto">
-                        {realtimeUpdates.map((update, index) => (
-                          <div key={`${update.timestamp}-${index}`} className="text-sm bg-gray-50 p-3 rounded">
-                            <div className="flex justify-between items-start">
-                              <span className="font-medium text-blue-600">
-                                {update.type}
-                              </span>
-                              <span className="text-gray-500 text-xs">
-                                {update.timestamp}
-                              </span>
-                            </div>
-                            <pre className="mt-1 text-gray-700 whitespace-pre-wrap">
-                              {JSON.stringify(update.data, null, 2)}
-                            </pre>
-                          </div>
-                        ))}
-                      </div>
+                    <div className={`bg-white rounded-lg shadow-lg p-6 mb-6 ${animations.slideInFromLeft} ${presets.card.hover}`}>
+                      <RealtimeUpdatesDisplay
+                        updates={realtimeUpdates}
+                        onClear={clearRealtimeUpdates}
+                        isProcessing={isProcessing}
+                      />
                     </div>
                   )}
                 </div>

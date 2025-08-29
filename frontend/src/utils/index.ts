@@ -67,3 +67,6 @@ export function debounce<T extends (...args: unknown[]) => void>(
     timeout = setTimeout(() => func(...args), wait);
   };
 }
+
+// Re-export animation utilities
+export * from './animations';

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { KeyboardEvent } from 'react';
 
 export type Page = 'credentials' | 'certification';
 
@@ -24,7 +25,7 @@ export function Menu({ currentPage, onPageChange }: MenuProps) {
     setIsOpen(false);
   };
 
-  const handleOverlayKeyDown = (event: React.KeyboardEvent) => {
+  const handleOverlayKeyDown = (event: KeyboardEvent) => {
     if (event.key === 'Enter' || event.key === ' ') {
       setIsOpen(false);
     }
@@ -36,7 +37,10 @@ export function Menu({ currentPage, onPageChange }: MenuProps) {
       <button
         type="button"
         onClick={toggleMenu}
-        className="fixed top-4 left-4 z-50 bg-black rounded-lg p-4 shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-600 hover:border-gray-400"
+        className="!fixed !top-4 !left-4 !z-[9999] !bg-red-500 !text-white !rounded-lg !p-4 !shadow-2xl hover:!shadow-3xl !transition-all !duration-200 !border-4 !border-yellow-400 hover:!border-yellow-300 hover:!bg-red-600 !w-auto !h-auto"
+        style={{
+          zIndex: 9999
+        }}
         aria-label="Toggle menu"
         aria-expanded={isOpen}
         aria-controls="app-menu-panel"
@@ -61,23 +65,31 @@ export function Menu({ currentPage, onPageChange }: MenuProps) {
 
       {/* Menu Panel */}
       {isOpen && (
-        <dialog
+        <div
           id="app-menu-panel"
-          aria-modal="true"
-          className="fixed top-0 left-0 h-full w-80 bg-white shadow-2xl z-50 m-0"
+          className="!fixed !top-0 !left-0 !h-full !w-80 !bg-red-100 !border-4 !border-blue-500 !z-[10000] !shadow-2xl"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            height: '100vh',
+            width: '320px',
+            backgroundColor: '#fee2e2',
+            border: '4px solid #3b82f6',
+            zIndex: 10000,
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          }}
         >
           <div className="p-6">
             <div className="flex items-center justify-between mb-8">
-              <h2 className="text-xl font-bold text-gray-900">USCIS Tools</h2>
+              <h2 className="!text-2xl !font-bold !text-red-800 !bg-yellow-200 !p-2 !rounded">USCIS Tools</h2>
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="!p-2 !bg-red-500 !text-white !rounded-lg !hover:bg-red-600"
                 aria-label="Close menu"
               >
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                ✕
               </button>
             </div>
 
@@ -87,32 +99,37 @@ export function Menu({ currentPage, onPageChange }: MenuProps) {
                   type="button"
                   key={item.id}
                   onClick={() => handleMenuItemClick(item.id)}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-all duration-200 ${
-                    currentPage === item.id
-                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                      : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
+                  className="!w-full !flex !items-center !space-x-3 !px-4 !py-3 !rounded-lg !text-left !bg-blue-200 !text-blue-900 !border-2 !border-blue-400 !hover:bg-blue-300 !transition-all !duration-200"
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px 16px',
+                    backgroundColor: '#bfdbfe',
+                    color: '#1e3a8a',
+                    border: '2px solid #60a5fa',
+                    borderRadius: '8px'
+                  }}
                   aria-current={currentPage === item.id ? 'page' : undefined}
                 >
-                  <span className="text-sm">{item.icon}</span>
-                  <span className="font-medium">{item.label}</span>
+                  <span className="!text-lg">{item.icon}</span>
+                  <span className="!font-medium !text-lg">{item.label}</span>
                   {currentPage === item.id && (
-                    <svg className="w-4 h-4 ml-auto text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
+                    <span className="!ml-auto !text-green-600 !text-lg">✓</span>
                   )}
                 </button>
               ))}
             </nav>
 
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <div className="text-sm text-gray-500">
-                <p className="mb-2">Secure USCIS API Tools</p>
+            <div className="!mt-8 !pt-6 !border-t-2 !border-gray-400">
+              <div className="!text-sm !text-gray-700 !bg-green-100 !p-3 !rounded">
+                <p className="!mb-2 !font-bold">Secure USCIS API Tools</p>
                 <p>All processing done locally using WebAssembly</p>
               </div>
             </div>
           </div>
-        </dialog>
+        </div>
       )}
     </>
   );

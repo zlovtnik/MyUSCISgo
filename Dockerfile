@@ -8,9 +8,11 @@ RUN apk add --no-cache git ca-certificates
 # Set working directory
 WORKDIR /app/go
 
-# Copy go mod and sum files
-COPY go/go.mod ./
-COPY go/go.sum ./
+# Copy go mod and sum files (handle missing go.sum gracefully)
+COPY go/go.mod* go/go.sum* ./
+
+# Ensure go.sum exists (generate if missing)
+RUN if [ ! -f go.sum ]; then go mod tidy; fi
 
 # Download dependencies
 RUN go mod download
@@ -22,11 +24,23 @@ COPY go/ .
 RUN GOOS=js GOARCH=wasm go build -o /app/main.wasm -ldflags="-s -w" -trimpath
 
 # Copy wasm_exec.js (location varies across Go versions)
-RUN WASM_EXEC_PATH=$(find "$(go env GOROOT)" -name "wasm_exec.js" -type f 2>/dev/null | head -1) && \
-    if [ -n "$WASM_EXEC_PATH" ]; then \
-        cp "$WASM_EXEC_PATH" /app/wasm_exec.js; \
+RUN set -e && \
+    GOROOT=$(go env GOROOT) && \
+    # Try common paths in order of preference \
+    if [ -f "$GOROOT/lib/wasm/wasm_exec.js" ]; then \
+        cp "$GOROOT/lib/wasm/wasm_exec.js" /app/wasm_exec.js; \
+    elif [ -f "$GOROOT/misc/wasm/wasm_exec.js" ]; then \
+        cp "$GOROOT/misc/wasm/wasm_exec.js" /app/wasm_exec.js; \
     else \
-        echo "Error: wasm_exec.js not found in Go installation" >&2 && exit 1; \
+        # Fallback: search dynamically \
+        WASM_EXEC_PATH=$(find "$GOROOT" -name "wasm_exec.js" -type f 2>/dev/null | head -1) && \
+        if [ -n "$WASM_EXEC_PATH" ]; then \
+            cp "$WASM_EXEC_PATH" /app/wasm_exec.js; \
+        else \
+            echo "Error: wasm_exec.js not found in Go installation at $GOROOT" >&2 && \
+            echo "Searched in: $GOROOT/lib/wasm/, $GOROOT/misc/wasm/, and subdirectories" >&2 && \
+            exit 1; \
+        fi \
     fi
 
 # React build stage
@@ -39,7 +53,7 @@ COPY frontend/package*.json ./
 
 # Install ALL dependencies (including devDependencies needed for build)
 # Using npm ci for deterministic, fast installs
-RUN npm ci
+RUN npm ci --include=optional
 
 # Copy source code
 COPY frontend/ .
@@ -51,12 +65,25 @@ COPY --from=go-builder /app/wasm_exec.js public/
 # Build the application (devDependencies available during build)
 RUN npm run build
 
+# Clean up node_modules to reduce image size (optional, but keeps build cache clean)
+RUN rm -rf node_modules
+
+# Production dependencies stage (optional - for Node.js runtime if needed)
+FROM node:20-alpine AS production-deps
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+# Install only production dependencies
+RUN npm ci --omit=dev --omit=optional && npm cache clean --force
+
 # Final runtime stage with Nginx (no Node.js runtime needed)
 # Note: If using Node.js runtime instead, use:
 # FROM node:20-alpine AS runtime
-# COPY --from=react-builder /app/frontend/package*.json ./
-# RUN npm ci --omit=dev && npm cache clean --force
+# WORKDIR /app/frontend
+# COPY --from=production-deps /app/frontend/node_modules ./node_modules
 # COPY --from=react-builder /app/frontend/dist ./dist
+# COPY --from=react-builder /app/frontend/package*.json ./
+# EXPOSE 3000
+# CMD ["npm", "run", "preview"]
 FROM nginx:alpine
 
 # Install security updates
