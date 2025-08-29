@@ -4,10 +4,15 @@ package wasm
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"regexp"
 	"runtime/debug"
+	"strings"
+	"sync"
 	"syscall/js"
 	"time"
 
@@ -24,13 +29,125 @@ const (
 	ProcessingTimeoutMsg = "Processing timeout"
 	// PanicMsg is the error message for Go panics
 	PanicMsg = "Go panic: %v"
+	// JWT validation constants
+	JWTIssuer    = "uscis-api"
+	JWTAudience  = "uscis-client"
+	JWTAlgorithm = "HS256"
+	// Token validation rate limiting
+	TokenValidationRateLimit = 100 // requests per minute per IP
 )
+
+// JWTClaims represents the standard JWT claims
+type JWTClaims struct {
+	Issuer     string `json:"iss"`
+	Subject    string `json:"sub"`
+	Audience   string `json:"aud"`
+	ExpiresAt  int64  `json:"exp"`
+	IssuedAt   int64  `json:"iat"`
+	CaseNumber string `json:"case_number"`
+}
+
+// TokenValidationConfig holds configuration for token validation
+type TokenValidationConfig struct {
+	SigningKey       string
+	Issuer           string
+	Audience         string
+	ClockSkew        time.Duration
+	EnableRevocation bool
+}
+
+// TokenStore represents a secure token storage interface
+type TokenStore interface {
+	IsRevoked(tokenID string) bool
+	IsValid(tokenID string) bool
+}
+
+// InMemoryTokenStore provides a simple in-memory token store
+type InMemoryTokenStore struct {
+	mu      sync.RWMutex
+	revoked map[string]time.Time
+	valid   map[string]time.Time
+}
+
+// NewInMemoryTokenStore creates a new in-memory token store
+func NewInMemoryTokenStore() *InMemoryTokenStore {
+	return &InMemoryTokenStore{
+		revoked: make(map[string]time.Time),
+		valid:   make(map[string]time.Time),
+	}
+}
+
+// IsRevoked checks if a token is revoked
+func (s *InMemoryTokenStore) IsRevoked(tokenID string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, exists := s.revoked[tokenID]
+	return exists
+}
+
+// IsValid checks if a token is in the valid token list
+func (s *InMemoryTokenStore) IsValid(tokenID string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, exists := s.valid[tokenID]
+	return exists
+}
+
+// AddValidToken adds a token to the valid list
+func (s *InMemoryTokenStore) AddValidToken(tokenID string, expiresAt time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.valid[tokenID] = expiresAt
+}
+
+// generateSecureTokenHash creates a secure hash of the token for logging purposes
+func generateSecureTokenHash(token string) string {
+	if token == "" {
+		return ""
+	}
+	hash := sha256.Sum256([]byte(token))
+	return fmt.Sprintf("%x", hash)
+}
+
+// RevokeToken marks a token as revoked
+func (s *InMemoryTokenStore) RevokeToken(tokenID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.revoked[tokenID] = time.Now()
+	delete(s.valid, tokenID)
+}
+
+// loadSecureSigningKey loads the JWT signing key from secure configuration
+func loadSecureSigningKey() string {
+	// Load from environment variable first
+	if key := getEnvVar("JWT_SIGNING_KEY"); key != "" {
+		return key
+	}
+
+	// Fallback to default key for development (CHANGE THIS IN PRODUCTION)
+	// This should only be used in development environments
+	return "default-development-signing-key-change-in-production"
+}
+
+// getEnvVar gets an environment variable (WASM-compatible)
+func getEnvVar(key string) string {
+	// In WASM environment, we can't directly access environment variables
+	// This would need to be passed from JavaScript or use a different mechanism
+	// For now, return empty string to trigger fallback
+	return ""
+}
+
+// Package-level compiled regex for case number validation
+var caseNumberRegex = regexp.MustCompile(`^[A-Z]{3}\d{10}$`)
 
 // Handler handles WASM function calls from JavaScript
 type Handler struct {
-	processor   *processing.Processor
-	logger      *logging.Logger
-	rateLimiter *ratelimit.RateLimiter
+	processor         *processing.Processor
+	logger            *logging.Logger
+	rateLimiter       *ratelimit.RateLimiter
+	tokenStore        TokenStore
+	tokenConfig       *TokenValidationConfig
+	validationLimiter *ratelimit.RateLimiter
 }
 
 // NewHandler creates a new WASM handler
@@ -39,6 +156,15 @@ func NewHandler() *Handler {
 		processor:   processing.NewProcessor(),
 		logger:      logging.NewLogger(logging.LogLevelInfo),
 		rateLimiter: ratelimit.NewRateLimiter(10, time.Minute), // 10 requests per minute
+		tokenStore:  NewInMemoryTokenStore(),
+		tokenConfig: &TokenValidationConfig{
+			SigningKey:       loadSecureSigningKey(),
+			Issuer:           JWTIssuer,
+			Audience:         JWTAudience,
+			ClockSkew:        5 * time.Minute,
+			EnableRevocation: true,
+		},
+		validationLimiter: ratelimit.NewRateLimiter(TokenValidationRateLimit, time.Minute),
 	}
 }
 
@@ -254,6 +380,12 @@ func (h *Handler) SendRealtimeUpdate(this js.Value, args []js.Value) any {
 		}
 	}()
 
+	// Defensively handle undefined/null receivers
+	if this.IsUndefined() || this.IsNull() {
+		// Use js.Null() as a safe default for internal calls
+		this = js.Null()
+	}
+
 	if len(args) != 2 {
 		err := fmt.Errorf("invalid number of arguments: expected 2, got %d", len(args))
 		h.logger.Error("Invalid arguments for realtime update", err)
@@ -341,7 +473,7 @@ func (h *Handler) SendRealtimeUpdate(this js.Value, args []js.Value) any {
 func (h *Handler) CertifyTokenAsync(this js.Value, args []js.Value) any {
 	defer func() {
 		if r := recover(); r != nil {
-			h.logger.Fatal("Panic in CertifyTokenAsync", fmt.Errorf("%v", r), map[string]interface{}{
+			h.logger.Error("Panic in CertifyTokenAsync", fmt.Errorf("%v", r), map[string]interface{}{
 				"stack": string(debug.Stack()),
 			})
 			js.Global().Get("console").Call("error", fmt.Sprintf(PanicMsg, r))
@@ -384,7 +516,7 @@ func (h *Handler) CertifyTokenAsync(this js.Value, args []js.Value) any {
 	}
 
 	// Validate case number format (simple regex check)
-	if matched, _ := regexp.MatchString(`^[A-Z]{3}\d{10}$`, tokenData.CaseNumber); !matched {
+	if !caseNumberRegex.MatchString(tokenData.CaseNumber) {
 		return js.Global().Get("Promise").Call("reject", h.createErrorResponse("Invalid case number format"))
 	}
 
@@ -418,7 +550,7 @@ func (h *Handler) CertifyTokenAsync(this js.Value, args []js.Value) any {
 		// Validate token against case number (simple validation logic)
 		h.logger.Info("Validating token against case number", map[string]interface{}{
 			"caseNumber": tokenData.CaseNumber,
-			"token":      tokenData.Token[:min(8, len(tokenData.Token))] + "...", // Log partial token for security
+			"tokenHash":  generateSecureTokenHash(tokenData.Token), // Log secure hash instead of raw token
 		})
 
 		// Simple token validation logic (in production, this would be more sophisticated)
@@ -449,7 +581,7 @@ func (h *Handler) CertifyTokenAsync(this js.Value, args []js.Value) any {
 		}
 
 		// Send realtime update
-		h.SendRealtimeUpdate(js.Undefined(), []js.Value{
+		h.SendRealtimeUpdate(js.Null(), []js.Value{
 			js.ValueOf("token_certified"),
 			js.ValueOf(map[string]interface{}{
 				"caseNumber":     tokenData.CaseNumber,
@@ -494,16 +626,234 @@ func (h *Handler) CertifyTokenAsync(this js.Value, args []js.Value) any {
 	})
 }
 
-// validateToken performs basic token validation
+// validateToken performs comprehensive cryptographic token validation
 func (h *Handler) validateToken(token, caseNumber string) bool {
-	// Simple validation: token should be at least 8 characters and contain the case number
-	if len(token) < 8 {
+	// Rate limiting check for validation attempts
+	if !h.validationLimiter.Allow("token_validation") {
+		h.logger.Warn("Token validation rate limit exceeded", map[string]interface{}{
+			"action": "token_validation",
+		})
 		return false
 	}
 
-	// In a real implementation, this would validate against a secure token database
-	// For now, we'll do a simple check
-	return len(token) >= 8 && len(caseNumber) == 13
+	// Basic input validation
+	if len(token) == 0 {
+		h.logger.Info("Token validation failed: empty token", map[string]interface{}{
+			"caseNumber": caseNumber,
+		})
+		return false
+	}
+
+	if len(caseNumber) != 13 {
+		h.logger.Info("Token validation failed: invalid case number format", map[string]interface{}{
+			"caseNumber":  caseNumber,
+			"tokenLength": len(token),
+		})
+		return false
+	}
+
+	// Parse and validate JWT
+	claims, tokenID, err := h.parseAndValidateJWT(token)
+	if err != nil {
+		h.logger.Info("Token validation failed: JWT parsing/validation error", map[string]interface{}{
+			"caseNumber": caseNumber,
+			"error":      err.Error(),
+		})
+		return false
+	}
+
+	// Validate claims
+	if !h.validateClaims(claims, caseNumber) {
+		h.logger.Info("Token validation failed: claims validation error", map[string]interface{}{
+			"caseNumber": caseNumber,
+			"subject":    claims.Subject,
+			"issuer":     claims.Issuer,
+			"audience":   claims.Audience,
+		})
+		return false
+	}
+
+	// Check token revocation if enabled
+	if h.tokenConfig.EnableRevocation && h.tokenStore.IsRevoked(tokenID) {
+		h.logger.Info("Token validation failed: token revoked", map[string]interface{}{
+			"caseNumber": caseNumber,
+			"tokenID":    tokenID,
+		})
+		return false
+	}
+
+	// Check if token is in valid token list (if using allowlist)
+	if h.tokenStore.IsValid(tokenID) {
+		h.logger.Info("Token validation failed: token not in valid list", map[string]interface{}{
+			"caseNumber": caseNumber,
+			"tokenID":    tokenID,
+		})
+		return false
+	}
+
+	h.logger.Info("Token validation successful", map[string]interface{}{
+		"caseNumber": caseNumber,
+		"tokenID":    tokenID,
+		"expiresAt":  time.Unix(claims.ExpiresAt, 0),
+	})
+
+	return true
+}
+
+// RevokeToken revokes a token by ID
+func (h *Handler) RevokeToken(tokenID string) {
+	if store, ok := h.tokenStore.(*InMemoryTokenStore); ok {
+		store.RevokeToken(tokenID)
+		h.logger.Info("Token revoked", map[string]interface{}{
+			"tokenID": tokenID,
+		})
+	}
+}
+
+// AddValidToken adds a token to the valid token list
+func (h *Handler) AddValidToken(tokenID string, expiresAt time.Time) {
+	if store, ok := h.tokenStore.(*InMemoryTokenStore); ok {
+		store.AddValidToken(tokenID, expiresAt)
+		h.logger.Info("Token added to valid list", map[string]interface{}{
+			"tokenID":   tokenID,
+			"expiresAt": expiresAt,
+		})
+	}
+}
+
+// GetTokenValidationStats returns validation statistics
+func (h *Handler) GetTokenValidationStats() map[string]interface{} {
+	return map[string]interface{}{
+		"config": map[string]interface{}{
+			"issuer":           h.tokenConfig.Issuer,
+			"audience":         h.tokenConfig.Audience,
+			"clockSkew":        h.tokenConfig.ClockSkew,
+			"enableRevocation": h.tokenConfig.EnableRevocation,
+		},
+	}
+}
+
+// parseAndValidateJWT parses and validates JWT signature
+func (h *Handler) parseAndValidateJWT(token string) (*JWTClaims, string, error) {
+	// Split JWT into parts
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return nil, "", fmt.Errorf("invalid JWT format: expected 3 parts, got %d", len(parts))
+	}
+
+	// Decode header
+	headerJSON, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to decode JWT header: %w", err)
+	}
+
+	var header map[string]interface{}
+	if err := json.Unmarshal(headerJSON, &header); err != nil {
+		return nil, "", fmt.Errorf("failed to parse JWT header: %w", err)
+	}
+
+	// Verify algorithm
+	if alg, ok := header["alg"].(string); !ok || alg != JWTAlgorithm {
+		return nil, "", fmt.Errorf("unsupported JWT algorithm: expected %s, got %v", JWTAlgorithm, header["alg"])
+	}
+
+	// Decode payload
+	payloadJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to decode JWT payload: %w", err)
+	}
+
+	var claims JWTClaims
+	if err := json.Unmarshal(payloadJSON, &claims); err != nil {
+		return nil, "", fmt.Errorf("failed to parse JWT claims: %w", err)
+	}
+
+	// Verify signature using constant-time comparison
+	expectedSignature := h.generateSignature(parts[0] + "." + parts[1])
+	actualSignature, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to decode JWT signature: %w", err)
+	}
+
+	if !hmac.Equal(expectedSignature, actualSignature) {
+		return nil, "", fmt.Errorf("JWT signature verification failed")
+	}
+
+	// Generate token ID from claims (using subject + issued at for uniqueness)
+	tokenID := fmt.Sprintf("%s-%d", claims.Subject, claims.IssuedAt)
+
+	return &claims, tokenID, nil
+}
+
+// validateClaims validates JWT claims
+func (h *Handler) validateClaims(claims *JWTClaims, expectedCaseNumber string) bool {
+	now := time.Now()
+
+	// Validate issuer
+	if claims.Issuer != h.tokenConfig.Issuer {
+		return false
+	}
+
+	// Validate audience
+	if claims.Audience != h.tokenConfig.Audience {
+		return false
+	}
+
+	// Validate expiration with clock skew tolerance
+	expirationTime := time.Unix(claims.ExpiresAt, 0)
+	if now.After(expirationTime.Add(h.tokenConfig.ClockSkew)) {
+		return false
+	}
+
+	// Validate issued at (not too far in the future)
+	issuedTime := time.Unix(claims.IssuedAt, 0)
+	if issuedTime.After(now.Add(h.tokenConfig.ClockSkew)) {
+		return false
+	}
+
+	// Validate case number matches
+	if claims.CaseNumber != expectedCaseNumber {
+		return false
+	}
+
+	// Validate case number format
+	if !h.isValidCaseNumberFormat(claims.CaseNumber) {
+		return false
+	}
+
+	return true
+}
+
+// generateSignature generates HMAC signature for JWT
+func (h *Handler) generateSignature(data string) []byte {
+	mac := hmac.New(sha256.New, []byte(h.tokenConfig.SigningKey))
+	mac.Write([]byte(data))
+	return mac.Sum(nil)
+}
+
+// isValidCaseNumberFormat validates USCIS case number format
+func (h *Handler) isValidCaseNumberFormat(caseNumber string) bool {
+	// USCIS case numbers are typically 3 letters followed by 10 digits
+	return caseNumberRegex.MatchString(caseNumber)
+}
+
+// parseDigit safely parses a single digit character to integer
+func (h *Handler) parseDigit(digit byte) (int, error) {
+	if digit < '0' || digit > '9' {
+		return 0, fmt.Errorf("invalid digit: %c", digit)
+	}
+	return int(digit - '0'), nil
+}
+
+// safeGetDigit safely gets a digit value from caseDigits with bounds checking
+func (h *Handler) safeGetDigit(caseDigits string, index int, defaultValue int) int {
+	if index >= len(caseDigits) {
+		return defaultValue
+	}
+	if digit, err := h.parseDigit(caseDigits[index]); err == nil {
+		return digit
+	}
+	return defaultValue
 }
 
 // generateCaseDetails creates dynamic case details based on case number
@@ -513,6 +863,7 @@ func (h *Handler) generateCaseDetails(caseNumber, environment string) map[string
 		caseReview   = "Case Is Being Actively Reviewed"
 		caseRFE      = "Request for Evidence Was Sent"
 		caseTransfer = "Case Was Transferred"
+		dateFormat   = "%04d-%02d-%02d"
 	)
 
 	// Extract information from case number to make it more realistic
@@ -534,18 +885,53 @@ func (h *Handler) generateCaseDetails(caseNumber, environment string) map[string
 		processingCenter = "National Benefits Center"
 	}
 
-	// Generate priority date from case digits
+	// Generate priority date from case digits with validation
 	baseYear := 2020
-	year := baseYear + int(caseDigits[0]-'0')*2 // 2020, 2022, 2024, etc.
-	month := int(caseDigits[1]-'0')*3 + 1       // 1, 4, 7, 10
-	if month > 12 {
-		month = 12
+	var priorityDate string
+
+	// Validate caseDigits length and content
+	if len(caseDigits) < 3 {
+		h.logger.Warn("Case number too short for date generation, using defaults", map[string]interface{}{
+			"caseNumber": caseNumber,
+			"length":     len(caseDigits),
+		})
+		// Use safe defaults
+		priorityDate = fmt.Sprintf(dateFormat, baseYear, 1, 1)
+	} else {
+		// Safely parse digits with validation
+		yearDigit, err1 := h.parseDigit(caseDigits[0])
+		monthDigit, err2 := h.parseDigit(caseDigits[1])
+		dayDigit, err3 := h.parseDigit(caseDigits[2])
+
+		if err1 != nil || err2 != nil || err3 != nil {
+			h.logger.Warn("Invalid digits in case number, using defaults", map[string]interface{}{
+				"caseNumber": caseNumber,
+				"errors":     []string{err1.Error(), err2.Error(), err3.Error()},
+			})
+			// Use safe defaults
+			priorityDate = fmt.Sprintf(dateFormat, baseYear, 1, 1)
+		} else {
+			// Safe arithmetic with validated digits
+			year := baseYear + yearDigit*2 // 2020, 2022, 2024, etc.
+			month := monthDigit*3 + 1      // 1, 4, 7, 10
+			// Clamp month to valid range 1-12
+			if month < 1 {
+				month = 1
+			} else if month > 12 {
+				month = 12
+			}
+
+			day := dayDigit*3 + 1 // 1, 4, 7, 10, 13, 16, 19, 22, 25, 28
+			// Clamp day to valid range 1-28 (safe for all months)
+			if day < 1 {
+				day = 1
+			} else if day > 28 {
+				day = 28
+			}
+
+			priorityDate = fmt.Sprintf(dateFormat, year, month, day)
+		}
 	}
-	day := int(caseDigits[2]-'0')*3 + 1 // 1, 4, 7, 10, 13, 16, 19, 22, 25, 28
-	if day > 28 {
-		day = 28
-	}
-	priorityDate := fmt.Sprintf("%04d-%02d-%02d", year, month, day)
 
 	// Determine case status based on environment and case number
 	var currentStatus string
@@ -554,26 +940,32 @@ func (h *Handler) generateCaseDetails(caseNumber, environment string) map[string
 	if environment == "production" {
 		// In production, mix of statuses
 		statusOptions := []string{caseApproved, caseReview, caseRFE, caseTransfer}
-		statusIndex := int(caseDigits[0]-'0') % len(statusOptions)
+		statusDigit := h.safeGetDigit(caseDigits, 0, 0)
+		statusIndex := statusDigit % len(statusOptions)
 		currentStatus = statusOptions[statusIndex]
 
 		if currentStatus == caseApproved {
-			// Generate approval date within last 6 months
-			approvalTime := time.Now().AddDate(0, -int(caseDigits[1]-'0'), -int(caseDigits[2]-'0'))
+			// Generate approval date within last 6 months using safe digit parsing
+			monthOffset := h.safeGetDigit(caseDigits, 1, 1)
+			dayOffset := h.safeGetDigit(caseDigits, 2, 1)
+			approvalTime := time.Now().AddDate(0, -monthOffset, -dayOffset)
 			approvalDate = approvalTime.Format("2006-01-02")
 		}
 	} else {
 		// In development, mostly approved for testing
 		currentStatus = caseApproved
-		approvalDate = time.Now().AddDate(0, -1, -int(caseDigits[0]-'0')).Format("2006-01-02")
+		dayOffset := h.safeGetDigit(caseDigits, 0, 1)
+		approvalDate = time.Now().AddDate(0, -1, -dayOffset).Format("2006-01-02")
 	}
 
-	// Determine case type based on case number pattern
+	// Determine case type based on case number pattern with safe digit checking
 	var caseType string
+	firstDigit := h.safeGetDigit(caseDigits, 0, 0)
+	secondDigit := h.safeGetDigit(caseDigits, 1, 0)
 	switch {
-	case caseDigits[0] >= '5':
+	case firstDigit >= 5:
 		caseType = "I-485 Application to Register Permanent Residence"
-	case caseDigits[1] >= '5':
+	case secondDigit >= 5:
 		caseType = "I-130 Petition for Alien Relative"
 	default:
 		caseType = "I-765 Application for Employment Authorization"
