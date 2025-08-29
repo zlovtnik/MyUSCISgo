@@ -22,6 +22,47 @@ func NewProcessor() *Processor {
 	}
 }
 
+// maskTokenHint creates a non-sensitive hint from a token for logging/debugging purposes
+func maskTokenHint(token string) string {
+	if len(token) <= 8 {
+		return "****"
+	}
+	// Return first 4 and last 4 characters with masking
+	return token[:4] + "****" + token[len(token)-4:]
+}
+
+// createSafeResult creates a client-safe version of ProcessingResult with sensitive data scrubbed
+func createSafeResult(result *types.ProcessingResult) *types.ProcessingResult {
+	if result == nil {
+		return nil
+	}
+
+	safeResult := &types.ProcessingResult{
+		BaseURL:   result.BaseURL,
+		AuthMode:  result.AuthMode,
+		TokenHint: maskTokenHint(result.TokenHint), // Mask the token hint
+		Config:    make(map[string]string),
+	}
+
+	// Copy config
+	for k, v := range result.Config {
+		safeResult.Config[k] = v
+	}
+
+	// Scrub OAuth token if present
+	if result.OAuthToken != nil {
+		safeResult.OAuthToken = &types.OAuthToken{
+			AccessToken: "", // Scrub access token for client safety
+			TokenType:   result.OAuthToken.TokenType,
+			ExpiresIn:   result.OAuthToken.ExpiresIn,
+			ExpiresAt:   result.OAuthToken.ExpiresAt,
+			Scope:       result.OAuthToken.Scope,
+		}
+	}
+
+	return safeResult
+}
+
 // ProcessCredentialsAsync processes credentials asynchronously using Go concurrency features
 func (p *Processor) ProcessCredentialsAsync(ctx context.Context, creds *types.Credentials) (<-chan *types.ProcessingResult, <-chan error) {
 	resultCh := make(chan *types.ProcessingResult, 1)
@@ -48,7 +89,7 @@ func (p *Processor) ProcessCredentialsAsync(ctx context.Context, creds *types.Cr
 		})
 
 		// Simulate async processing with context support
-		result, err := p.processWithContext(ctx, secureCreds)
+		result, err := p.processWithContext(ctx, creds) // Pass original creds, not secureCreds
 		if err != nil {
 			p.logger.Error("Processing failed", err, map[string]interface{}{
 				"clientId":    secureCreds.ClientID,
@@ -81,7 +122,7 @@ func (p *Processor) ProcessCredentialsSync(ctx context.Context, creds *types.Cre
 	})
 
 	// Process with context
-	result, err := p.processWithContext(ctx, secureCreds)
+	result, err := p.processWithContext(ctx, creds) // Pass original creds, not secureCreds
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +132,7 @@ func (p *Processor) ProcessCredentialsSync(ctx context.Context, creds *types.Cre
 		"environment": secureCreds.Environment,
 	})
 
-	return result, nil
+	return createSafeResult(result), nil
 }
 
 // processWithContext processes credentials with context support
@@ -103,25 +144,34 @@ func (p *Processor) processWithContext(ctx context.Context, creds *types.Credent
 	default:
 	}
 
+	// Create secure version of credentials for logging (hashed secret)
+	secureCreds, err := security.SecureCredentials(creds)
+	if err != nil {
+		return nil, fmt.Errorf("security validation failed: %w", err)
+	}
+
 	// Generate secure token
 	token, err := security.GenerateSecureToken(creds.ClientID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token: %w", err)
 	}
 
-	// Generate OAuth token for USCIS API
-	oauthToken, err := security.GenerateOAuthToken(creds.ClientID, creds.ClientSecret)
+	// Generate OAuth token for USCIS API with timeout context
+	oauthCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	oauthToken, err := security.GenerateOAuthToken(oauthCtx, creds.ClientID, creds.ClientSecret)
 	if err != nil {
 		p.logger.Error("Failed to generate OAuth token", err, logging.SanitizeLogData(map[string]interface{}{
-			"clientId":    creds.ClientID,
-			"environment": creds.Environment,
+			"clientId":    secureCreds.ClientID, // Use secureCreds for logging
+			"environment": secureCreds.Environment,
 		}))
 		return nil, fmt.Errorf("failed to generate OAuth token: %w", err)
 	}
 
 	// Process based on environment
 	result := &types.ProcessingResult{
-		TokenHint:  token, // Contains the full secure token for processing (rename to SecureToken if this causes confusion)
+		TokenHint:  maskTokenHint(token), // Masked token hint for debugging (not the full token)
 		OAuthToken: convertToTypesOAuthToken(oauthToken),
 		Config:     make(map[string]string),
 	}
@@ -184,7 +234,7 @@ func (p *Processor) processWithContext(ctx context.Context, creds *types.Credent
 			})
 
 			// Attempt to refresh the token
-			newToken, refreshErr := security.RefreshOAuthToken(creds.ClientID, creds.ClientSecret, "")
+			newToken, refreshErr := security.RefreshOAuthToken(ctx, creds.ClientID, creds.ClientSecret, "")
 			if refreshErr != nil {
 				p.logger.Error("OAuth token refresh failed", refreshErr, logging.SanitizeLogData(map[string]interface{}{
 					"clientId":    creds.ClientID,
@@ -208,7 +258,7 @@ func (p *Processor) processWithContext(ctx context.Context, creds *types.Credent
 		return nil, err
 	}
 
-	return result, nil
+	return createSafeResult(result), nil
 }
 
 // addEnvironmentSpecificProcessing adds environment-specific logic
@@ -311,7 +361,7 @@ func convertToTypesOAuthToken(token *security.OAuthToken) *types.OAuthToken {
 		return nil
 	}
 	return &types.OAuthToken{
-		AccessToken: token.AccessToken,
+		AccessToken: token.AccessToken, // Keep full token for internal validation
 		TokenType:   token.TokenType,
 		ExpiresIn:   token.ExpiresIn,
 		ExpiresAt:   token.ExpiresAt.Format(time.RFC3339),
