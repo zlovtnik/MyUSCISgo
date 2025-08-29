@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { WASMResponse, Credentials } from '../types';
+import type { WASMResponse, Credentials, TokenCertificationResult } from '../types';
 import { toast } from 'react-toastify';
 
 declare global {
@@ -40,6 +40,15 @@ export function useWasm() {
           if (resolveRequest) {
             pendingRequestsRef.current.delete(requestId);
             resolveRequest.resolve(result);
+          }
+          break;
+        }
+
+        case 'certify-result': {
+          const resolveCertify = pendingRequestsRef.current.get(requestId);
+          if (resolveCertify) {
+            pendingRequestsRef.current.delete(requestId);
+            resolveCertify.resolve(result);
           }
           break;
         }
@@ -90,6 +99,7 @@ export function useWasm() {
 
     const handleError = (error: ErrorEvent) => {
       setError('Web Worker failed to load');
+      setIsLoading(false);
       toast.error('Web Worker failed to load');
       console.error('Web Worker error:', error);
     };
@@ -105,11 +115,19 @@ export function useWasm() {
       worker.removeEventListener('error', handleError);
       worker.terminate();
       workerRef.current = null;
+      // Fail all pending requests on teardown
+      for (const [, { reject }] of pendingRequestsRef.current) {
+        try { reject(new Error('WASM worker disposed')); } catch {}
+      }
       pendingRequestsRef.current.clear();
     };
   }, []);
 
-  const processCredentials = useCallback(async (credentials: Credentials): Promise<WASMResponse> => {
+  const postWithTimeout = useCallback(<T>(
+    type: string,
+    data: any,
+    timeoutMs: number = 30000
+  ): Promise<T> => {
     if (!isLoaded || !workerRef.current) {
       throw new Error('WASM module not loaded');
     }
@@ -120,8 +138,8 @@ export function useWasm() {
       pendingRequestsRef.current.set(requestId, { resolve, reject });
 
       workerRef.current!.postMessage({
-        type: 'process',
-        data: credentials,
+        type,
+        data,
         requestId
       });
 
@@ -131,9 +149,17 @@ export function useWasm() {
           pendingRequestsRef.current.delete(requestId);
           reject(new Error('Request timeout'));
         }
-      }, 30000); // 30 second timeout
+      }, timeoutMs);
     });
   }, [isLoaded]);
+
+  const processCredentials = useCallback(async (credentials: Credentials): Promise<WASMResponse> => {
+    return postWithTimeout<WASMResponse>('process', credentials);
+  }, [postWithTimeout]);
+
+  const certifyToken = useCallback(async (tokenData: { token: string; caseNumber: string; environment: string }): Promise<TokenCertificationResult> => {
+    return postWithTimeout<TokenCertificationResult>('certify-token', tokenData);
+  }, [postWithTimeout]);
 
   const healthCheck = useCallback(async (): Promise<any> => {
     if (!isLoaded || !workerRef.current) {
@@ -194,6 +220,7 @@ export function useWasm() {
     isLoading,
     error,
     processCredentials,
+    certifyToken,
     healthCheck,
     clearCache,
     realtimeUpdates,

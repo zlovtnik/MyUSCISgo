@@ -8,7 +8,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "80:80"
-      - "443:443"
+      # - "443:443"  # HTTPS disabled - uncomment when SSL certificates are configured
     environment:
       - NODE_ENV=production
     volumes:
@@ -29,6 +29,7 @@ services:
 
   # Optional: Reverse proxy with SSL termination
   # proxy:
+  #   profiles: ["tls"]
   #   image: nginx:alpine
   #   ports:
   #     - "80:80"
@@ -45,6 +46,7 @@ services:
 
   # Optional: Redis for caching (if needed for session management)
   # redis:
+  #   profiles: ["cache"]
   #   image: redis:alpine
   #   ports:
   #     - "6379:6379"

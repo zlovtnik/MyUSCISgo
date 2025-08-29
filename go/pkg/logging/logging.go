@@ -193,17 +193,42 @@ func Fatal(message string, err error, fields ...map[string]interface{}) {
 
 // SanitizeLogData removes sensitive information from log data
 func SanitizeLogData(data map[string]interface{}) map[string]interface{} {
+	const redacted = "***REDACTED***"
 	sanitized := make(map[string]interface{})
 
 	for k, v := range data {
-		// Remove or mask sensitive fields
-		switch strings.ToLower(k) {
-		case "password", "secret", "token", "key", "credential":
-			sanitized[k] = "***REDACTED***"
+		lowerKey := strings.ToLower(k)
+
+		switch lowerKey {
+		case "password", "secret", "token", "key", "credential", "access_token", "oauth_token", "bearer_token":
+			sanitized[k] = redacted
+		case "authorization", "authorization_header":
+			sanitized[k] = sanitizeAuthorizationHeader(v, redacted)
 		default:
 			sanitized[k] = v
 		}
 	}
 
 	return sanitized
+}
+
+// sanitizeAuthorizationHeader safely masks authorization headers
+func sanitizeAuthorizationHeader(value interface{}, redacted string) string {
+	str, ok := value.(string)
+	if !ok {
+		return redacted
+	}
+
+	lowerStr := strings.ToLower(str)
+	if strings.HasPrefix(lowerStr, "bearer ") {
+		parts := strings.SplitN(str, " ", 2)
+		if len(parts) == 2 {
+			token := parts[1]
+			if len(token) > 10 {
+				return "Bearer " + token[:4] + "***" + token[len(token)-4:]
+			}
+		}
+	}
+
+	return redacted
 }

@@ -14,10 +14,20 @@ type Credentials struct {
 
 // ProcessingResult represents the result of processing credentials
 type ProcessingResult struct {
-	BaseURL   string            `json:"baseURL"`
-	AuthMode  string            `json:"authMode"`
-	TokenHint string            `json:"tokenHint"`
-	Config    map[string]string `json:"config"`
+	BaseURL    string            `json:"baseURL"`
+	AuthMode   string            `json:"authMode"`
+	TokenHint  string            `json:"tokenHint"`
+	OAuthToken *OAuthToken       `json:"oauthToken,omitempty"`
+	Config     map[string]string `json:"config"`
+}
+
+// OAuthToken represents an OAuth 2.0 access token
+type OAuthToken struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpiresIn   int    `json:"expires_in"`
+	ExpiresAt   string `json:"expires_at"` // RFC3339
+	Scope       string `json:"scope,omitempty"`
 }
 
 // WASMResponse represents the response sent back to JavaScript

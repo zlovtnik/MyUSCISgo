@@ -8,8 +8,9 @@ export default defineConfig({
   plugins: [react(), wasm()],
   server: {
     headers: {
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Opener-Policy': 'same-origin',
+      // Temporarily disable COEP for development to avoid extension conflicts
+      // 'Cross-Origin-Embedder-Policy': 'require-corp',
+      // 'Cross-Origin-Opener-Policy': 'same-origin',
     },
   },
   test: {

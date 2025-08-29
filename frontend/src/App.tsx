@@ -1,14 +1,19 @@
 import { useState } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import './App.css';
 import type { Credentials, ProcessingResult } from './types';
 import { useWasm } from './hooks/useWasm';
+import { Menu } from './components/Menu';
+import type { Page } from './components/Menu';
 import { CredentialForm } from './components/forms/CredentialForm';
 import { ResultDisplay } from './components/ResultDisplay';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorBoundary } from './components/error/ErrorBoundary';
+import { TokenCertification } from './components/TokenCertification';
 
 function AppContent() {
+  const [currentPage, setCurrentPage] = useState<Page>('credentials');
   const [result, setResult] = useState<ProcessingResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const { isLoaded, error: wasmError, processCredentials, realtimeUpdates, clearRealtimeUpdates } = useWasm();
@@ -21,22 +26,26 @@ function AppContent() {
 
     setIsProcessing(true);
     setResult(null);
+    if (process.env.NODE_ENV !== 'production') console.debug('Starting credential processing...');
 
     try {
       // Use the processCredentials function from the hook
       const response = await processCredentials(credentials);
+      if (process.env.NODE_ENV !== 'production') console.debug('WASM Response:', response);
 
       if (response.success && response.result) {
+        if (process.env.NODE_ENV !== 'production') console.debug('Setting result:', response.result);
         setResult(response.result);
         toast.success('Credentials processed successfully!');
       } else {
         const errorMessage = response.error || 'Unknown error occurred';
+        console.error('Processing failed:', errorMessage);
         toast.error(`Processing failed: ${errorMessage}`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      toast.error(`Unexpected error: ${errorMessage}`);
       console.error('Processing error:', error);
+      toast.error(`Unexpected error: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
     }
@@ -45,6 +54,12 @@ function AppContent() {
   const handleReset = () => {
     setResult(null);
     toast.info('Form reset. Ready for new request.');
+  };
+
+  const handlePageChange = (page: Page) => {
+    setCurrentPage(page);
+    setResult(null);
+    clearRealtimeUpdates();
   };
 
   // Show WASM loading error
@@ -94,114 +109,135 @@ function AppContent() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              USCIS Credential Processor
-            </h1>
-            <p className="text-gray-600">
-              Securely process your USCIS API credentials using WebAssembly
-            </p>
-          </div>
-
-          {/* Main Content */}
-          <div className="space-y-8">
-            {!result ? (
-              /* Credential Form */
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">
-                  Enter Your Credentials
-                </h2>
-                <CredentialForm
-                  onSubmit={handleCredentialsSubmit}
-                  isLoading={isProcessing}
-                  disabled={!isLoaded}
-                />
-              </div>
-            ) : (
-              /* Results Display */
-              <ResultDisplay
-                result={result}
-                onReset={handleReset}
-              />
-            )}
-
-            {/* Processing Indicator */}
-            {isProcessing && (
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <div className="text-center">
-                  <LoadingSpinner
-                    size="lg"
-                    message="Processing your credentials..."
-                    className="mb-4"
-                  />
+  const renderCurrentPage = () => {
+    if (process.env.NODE_ENV !== 'production') console.debug('Rendering page, current result:', result);
+    switch (currentPage) {
+      case 'credentials':
+        return (
+          <div className="min-h-screen bg-gray-50">
+            <div className="container mx-auto px-4 py-8">
+              <div className="max-w-4xl mx-auto">
+                {/* Header */}
+                <div className="text-center mb-8">
+                  <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                    USCIS Credential Processor
+                  </h1>
                   <p className="text-gray-600">
-                    Please wait while we securely process your information...
+                    Securely process your USCIS API credentials using WebAssembly
+                  </p>
+                </div>
+
+                {/* Main Content */}
+                <div className="space-y-8">
+                  {!result ? (
+                    /* Credential Form */
+                    <div className="bg-white rounded-lg shadow-lg p-6">
+                      <h2 className="text-xl font-semibold text-gray-900 mb-6">
+                        Enter Your Credentials
+                      </h2>
+                      <CredentialForm
+                        onSubmit={handleCredentialsSubmit}
+                        isLoading={isProcessing}
+                        disabled={!isLoaded}
+                      />
+                    </div>
+                  ) : (
+                    /* Results Display */
+                    <div>
+                      <ResultDisplay
+                        result={result}
+                        onReset={handleReset}
+                      />
+                    </div>
+                  )}
+
+                  {/* Processing Indicator */}
+                  {isProcessing && (
+                    <div className="bg-white rounded-lg shadow-lg p-6">
+                      <div className="text-center">
+                        <LoadingSpinner
+                          size="lg"
+                          message="Processing your credentials..."
+                          className="mb-4"
+                        />
+                        <p className="text-gray-600">
+                          Please wait while we securely process your information...
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Realtime Updates */}
+                  {realtimeUpdates.length > 0 && (
+                    <div className="bg-white rounded-lg shadow-lg p-6">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          Real-time Updates
+                        </h3>
+                        <button
+                          onClick={clearRealtimeUpdates}
+                          className="text-sm text-blue-600 hover:text-blue-800"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {realtimeUpdates.map((update, index) => (
+                          <div key={`${update.timestamp}-${index}`} className="text-sm bg-gray-50 p-3 rounded">
+                            <div className="flex justify-between items-start">
+                              <span className="font-medium text-blue-600">
+                                {update.type}
+                              </span>
+                              <span className="text-gray-500 text-xs">
+                                {update.timestamp}
+                              </span>
+                            </div>
+                            <pre className="mt-1 text-gray-700 whitespace-pre-wrap">
+                              {JSON.stringify(update.data, null, 2)}
+                            </pre>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-12 text-center text-sm text-gray-500">
+                  <p>
+                    Your credentials are processed securely using WebAssembly and are never stored on our servers.
                   </p>
                 </div>
               </div>
-            )}
+            </div>
+          </div>
+        );
+      case 'certification':
+        return <TokenCertification />;
+      default:
+        return null;
+    }
+  };
 
-            {/* Realtime Updates */}
-            {realtimeUpdates.length > 0 && (
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Real-time Updates
-                  </h3>
-                  <button
-                    onClick={clearRealtimeUpdates}
-                    className="text-sm text-blue-600 hover:text-blue-800"
-                  >
-                    Clear
-                  </button>
-                </div>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {realtimeUpdates.map((update, index) => (
-                    <div key={`${update.timestamp}-${index}`} className="text-sm bg-gray-50 p-3 rounded">
-                      <div className="flex justify-between items-start">
-                        <span className="font-medium text-blue-600">
-                          {update.type}
-                        </span>
-                        <span className="text-gray-500 text-xs">
-                          {update.timestamp}
-                        </span>
-                      </div>
-                      <pre className="mt-1 text-gray-700 whitespace-pre-wrap">
-                        {JSON.stringify(update.data, null, 2)}
-                      </pre>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="mt-12 text-center text-sm text-gray-500">
-            <p>
-              Your credentials are processed securely using WebAssembly and are never stored on our servers.
-            </p>
-          </div>
-        </div>
+  return (
+    <>
+      <Menu currentPage={currentPage} onPageChange={handlePageChange} />
+      <div className="App">
+        {renderCurrentPage()}
+
+        {/* Toast Notifications */}
+        <ToastContainer
+          position="top-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
       </div>
-
-      {/* Toast Notifications */}
-      <ToastContainer
-        position="top-right"
-        autoClose={5000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
-      />
-    </div>
+    </>
   );
 }
 

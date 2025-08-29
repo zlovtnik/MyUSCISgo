@@ -1,6 +1,7 @@
 package security
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -11,8 +12,22 @@ import (
 	"MyUSCISgo/pkg/types"
 )
 
-// HashSecret creates a temporary hash of the client secret for processing
-// This is a one-way hash that cannot be reversed
+// OAuthToken represents an OAuth 2.0 access token
+type OAuthToken struct {
+	AccessToken string    `json:"access_token"`
+	TokenType   string    `json:"token_type"`
+	ExpiresIn   int       `json:"expires_in"`
+	ExpiresAt   time.Time `json:"expires_at"`
+	Scope       string    `json:"scope,omitempty"`
+}
+
+// IsExpired checks if the OAuth token has expired
+func (t *OAuthToken) IsExpired() bool {
+	return time.Now().After(t.ExpiresAt)
+}
+
+// HashSecret creates a temporary, time-salted hash of the client secret for transient processing.
+// NOTE: Non-deterministic by design; do NOT persist or compare across calls.
 func HashSecret(secret string) string {
 	// Add a timestamp salt to make it time-sensitive
 	salt := fmt.Sprintf("%d", time.Now().UnixNano())
@@ -36,6 +51,65 @@ func GenerateSecureToken(clientID string) (string, error) {
 
 	hash := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(hash[:]), nil
+}
+
+// GenerateOAuthToken generates a mock OAuth token for USCIS API
+// In production, this would make an actual OAuth request to USCIS
+func GenerateOAuthToken(ctx context.Context, clientID, clientSecret string) (*OAuthToken, error) {
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	// Generate a secure access token
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return nil, fmt.Errorf("failed to generate token: %w", err)
+	}
+
+	// Create token with expiration (1 hour from now)
+	expiresAt := time.Now().Add(time.Hour)
+
+	token := &OAuthToken{
+		AccessToken: hex.EncodeToString(tokenBytes),
+		TokenType:   "Bearer",
+		ExpiresIn:   3600, // 1 hour in seconds
+		ExpiresAt:   expiresAt,
+		Scope:       "case-status:read",
+	}
+
+	return token, nil
+}
+
+// RefreshOAuthToken refreshes an expired OAuth token
+// In production, this would make a refresh token request to USCIS
+func RefreshOAuthToken(ctx context.Context, clientID, clientSecret, refreshToken string) (*OAuthToken, error) {
+	// For now, generate a new token (in production, use refresh token)
+	return GenerateOAuthToken(ctx, clientID, clientSecret)
+}
+
+// ValidateOAuthToken validates an OAuth token format and expiration
+// TODO: Consider injecting time.Now via a var to test edge cases (skew, near-expiry)
+func ValidateOAuthToken(token *OAuthToken) error {
+	if token == nil {
+		return fmt.Errorf("token is nil")
+	}
+
+	if token.AccessToken == "" {
+		return fmt.Errorf("access token is empty")
+	}
+
+	if token.IsExpired() {
+		return fmt.Errorf("token has expired")
+	}
+
+	if token.TokenType != "Bearer" {
+		return fmt.Errorf("unsupported token type: %s", token.TokenType)
+	}
+
+	return nil
 }
 
 // ValidateSecretFormat performs additional security checks on the secret
@@ -129,7 +203,6 @@ func ClearSensitiveData(data []byte) {
 
 // IsSecureEnvironment checks if we're running in a secure environment
 func IsSecureEnvironment() bool {
-	// In WASM context, we consider it secure if we're running in HTTPS
-	// This is a simplified check - in production, you'd want more robust checks
-	return true // For WASM, we'll assume secure context
+	// TODO: inject a checker or read an env/config flag set by the host (e.g., HTTPS detected).
+	return false
 }

@@ -54,11 +54,22 @@ export interface FormErrors {
   general?: string;
 }
 
-export interface FormState {
-  clientId: string;
-  clientSecret: string;
-  environment: Environment;
-  errors: FormErrors;
-  isSubmitting: boolean;
+export interface TokenCertificationResult {
   isValid: boolean;
+  caseStatus: string;
+  lastUpdated: string; // ISO 8601 format
+  caseDetails: Record<string, string>;
+  verificationId: string; // Always generated, present on both success and failure
+}
+
+export interface TokenCertificationData {
+  readonly token: string;
+  readonly caseNumber: string;
+  readonly environment: 'development' | 'production'; // Note: staging not supported for certification flows
+}
+
+export interface TokenCertificationResponse {
+  success: boolean;
+  result?: TokenCertificationResult;
+  error?: string;
 }
