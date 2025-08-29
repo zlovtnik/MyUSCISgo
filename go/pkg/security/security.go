@@ -1,6 +1,7 @@
 package security
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -54,7 +55,14 @@ func GenerateSecureToken(clientID string) (string, error) {
 
 // GenerateOAuthToken generates a mock OAuth token for USCIS API
 // In production, this would make an actual OAuth request to USCIS
-func GenerateOAuthToken(clientID, clientSecret string) (*OAuthToken, error) {
+func GenerateOAuthToken(ctx context.Context, clientID, clientSecret string) (*OAuthToken, error) {
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	// Generate a secure access token
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
@@ -77,9 +85,9 @@ func GenerateOAuthToken(clientID, clientSecret string) (*OAuthToken, error) {
 
 // RefreshOAuthToken refreshes an expired OAuth token
 // In production, this would make a refresh token request to USCIS
-func RefreshOAuthToken(clientID, clientSecret, refreshToken string) (*OAuthToken, error) {
+func RefreshOAuthToken(ctx context.Context, clientID, clientSecret, refreshToken string) (*OAuthToken, error) {
 	// For now, generate a new token (in production, use refresh token)
-	return GenerateOAuthToken(clientID, clientSecret)
+	return GenerateOAuthToken(ctx, clientID, clientSecret)
 }
 
 // ValidateOAuthToken validates an OAuth token format and expiration
