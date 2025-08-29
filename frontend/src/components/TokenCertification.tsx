@@ -83,12 +83,19 @@ export function TokenCertification({ onSubmit }: TokenCertificationProps) {
     } finally {
       setIsSubmitting(false);
     }
-  };  const handleInputChange = (field: keyof FormErrors) => (
+  };
+  
+  // Define type for form data keys that can be edited (excluding environment which has its own handler)
+  type EditableFormKeys = 'token' | 'caseNumber';
+
+  const handleInputChange = (field: EditableFormKeys) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
+    const value = field === 'caseNumber' ? e.target.value.toUpperCase() : e.target.value;
+    
     setFormData(prev => ({
       ...prev,
-      [field]: e.target.value
+      [field]: value
     }));
 
     // Clear error when user starts typing
