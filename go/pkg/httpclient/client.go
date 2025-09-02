@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"path"
 	"time"
 )
 
@@ -54,10 +56,35 @@ type Response struct {
 
 // Do performs an HTTP request
 func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
-	// Create HTTP request
-	httpReq, err := http.NewRequestWithContext(ctx, req.Method, c.baseURL+req.Path, nil)
+	// Build full URL safely
+	baseURL, err := url.Parse(c.baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse base URL: %w", err)
+	}
+	fullURL := baseURL.ResolveReference(&url.URL{Path: path.Join(baseURL.Path, req.Path)})
+
+	// Prepare request body if present
+	var bodyReader io.Reader
+	var bodyBytes []byte
+	if req.Body != nil {
+		bodyBytes, err = json.Marshal(req.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal request body: %w", err)
+		}
+		bodyReader = bytes.NewReader(bodyBytes)
+	}
+
+	// Create HTTP request with body
+	httpReq, err := http.NewRequestWithContext(ctx, req.Method, fullURL.String(), bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Set GetBody for retries if body is present
+	if req.Body != nil {
+		httpReq.GetBody = func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(bodyBytes)), nil
+		}
 	}
 
 	// Add headers
@@ -65,13 +92,8 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		httpReq.Header.Set(key, value)
 	}
 
-	// Add body if present
-	if req.Body != nil {
-		bodyBytes, err := json.Marshal(req.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal request body: %w", err)
-		}
-		httpReq.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	// Set Content-Type only if not already provided
+	if req.Body != nil && httpReq.Header.Get("Content-Type") == "" {
 		httpReq.Header.Set("Content-Type", "application/json")
 	}
 
@@ -89,7 +111,7 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 	}()
 
 	// Read response body
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}

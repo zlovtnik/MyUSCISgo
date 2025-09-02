@@ -184,7 +184,7 @@ func (p *Processor) processWithContext(ctx context.Context, creds *types.Credent
 	// Process based on environment
 	result := &types.ProcessingResult{
 		TokenHint:  maskTokenHint(token), // Masked token hint for debugging (not the full token)
-		OAuthToken: convertToTypesOAuthToken(oauthToken),
+		OAuthToken: oauthToken,           // oauthToken is already *types.OAuthToken
 		Config:     make(map[string]string),
 	}
 
@@ -227,45 +227,11 @@ func (p *Processor) processWithContext(ctx context.Context, creds *types.Credent
 
 	// Validate OAuth token
 	if result.OAuthToken != nil {
-		securityToken := &security.OAuthToken{
-			AccessToken: result.OAuthToken.AccessToken,
-			TokenType:   result.OAuthToken.TokenType,
-			ExpiresIn:   result.OAuthToken.ExpiresIn,
-			Scope:       result.OAuthToken.Scope,
+		if err := security.ValidateOAuthToken(result.OAuthToken); err != nil {
+			p.logger.Warn("OAuth token validation failed", map[string]interface{}{"error": err.Error()})
+			// Continue processing but log the warning
 		}
-
-		if expiresAt, err := time.Parse(time.RFC3339, result.OAuthToken.ExpiresAt); err == nil {
-			securityToken.ExpiresAt = expiresAt
-		}
-
-		if err := security.ValidateOAuthToken(securityToken); err != nil {
-			p.logger.Warn("OAuth token validation failed, attempting refresh", map[string]interface{}{
-				"clientId":    creds.ClientID,
-				"environment": creds.Environment,
-				"error":       err.Error(),
-			})
-
-			// Attempt to refresh the token
-			newToken, refreshErr := security.RefreshOAuthToken(ctx, creds.ClientID, creds.ClientSecret, "")
-			if refreshErr != nil {
-				p.logger.Error("OAuth token refresh failed", refreshErr, logging.SanitizeLogData(map[string]interface{}{
-					"clientId":    creds.ClientID,
-					"environment": creds.Environment,
-				}))
-				return nil, fmt.Errorf("OAuth token refresh failed: %w", refreshErr)
-			}
-
-			result.OAuthToken = convertToTypesOAuthToken(newToken)
-			p.logger.Info("OAuth token refreshed successfully", map[string]interface{}{
-				"clientId":    creds.ClientID,
-				"environment": creds.Environment,
-				"tokenType":   newToken.TokenType,
-				"scope":       newToken.Scope,
-			})
-		}
-	}
-
-	// Call real USCIS API instead of simulation
+	} // Call real USCIS API instead of simulation
 	if err := p.CallUSCISAPI(ctx, result, creds); err != nil {
 		return nil, err
 	}
@@ -276,7 +242,10 @@ func (p *Processor) processWithContext(ctx context.Context, creds *types.Credent
 // CallUSCISAPI makes real API calls to USCIS instead of simulation
 func (p *Processor) CallUSCISAPI(ctx context.Context, result *types.ProcessingResult, creds *types.Credentials) error {
 	// Create USCIS client for the environment
-	uscisClient := p.createUSCISClient(creds)
+	uscisClient, err := p.createUSCISClient(creds)
+	if err != nil {
+		return fmt.Errorf("failed to create USCIS client: %w", err)
+	}
 	p.uscisClient = uscisClient
 
 	// Get OAuth token if not present
@@ -327,7 +296,7 @@ func (p *Processor) CallUSCISAPI(ctx context.Context, result *types.ProcessingRe
 }
 
 // createUSCISClient creates a USCIS client based on environment
-func (p *Processor) createUSCISClient(creds *types.Credentials) *uscis.Client {
+func (p *Processor) createUSCISClient(creds *types.Credentials) (*uscis.Client, error) {
 	var baseURL string
 	var oauthConfig *uscis.OAuthConfig
 
@@ -394,18 +363,10 @@ func (p *Processor) getOAuthTokenWithRetry(ctx context.Context, creds *types.Cre
 
 // validateTokenWithRetry validates OAuth token with retry logic
 func (p *Processor) validateTokenWithRetry(ctx context.Context, token *types.OAuthToken, creds *types.Credentials) error {
-	securityToken := &security.OAuthToken{
-		AccessToken: token.AccessToken,
-		TokenType:   token.TokenType,
-		ExpiresIn:   token.ExpiresIn,
-		Scope:       token.Scope,
+	if err := security.ValidateOAuthToken(token); err != nil {
+		return fmt.Errorf("token validation failed: %w", err)
 	}
-
-	if expiresAt, err := time.Parse(time.RFC3339, token.ExpiresAt); err == nil {
-		securityToken.ExpiresAt = expiresAt
-	}
-
-	return security.ValidateOAuthToken(securityToken)
+	return nil
 }
 
 // refreshTokenWithRetry refreshes OAuth token with retry logic
@@ -480,18 +441,4 @@ func (p *Processor) getCaseStatusWithRetry(ctx context.Context, caseNumber strin
 	}
 
 	return caseStatus, nil
-}
-
-// convertToTypesOAuthToken converts security.OAuthToken to types.OAuthToken
-func convertToTypesOAuthToken(token *security.OAuthToken) *types.OAuthToken {
-	if token == nil {
-		return nil
-	}
-	return &types.OAuthToken{
-		AccessToken: token.AccessToken, // Keep full token for internal validation
-		TokenType:   token.TokenType,
-		ExpiresIn:   token.ExpiresIn,
-		ExpiresAt:   token.ExpiresAt.Format(time.RFC3339),
-		Scope:       token.Scope,
-	}
 }
