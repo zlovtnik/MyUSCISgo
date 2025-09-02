@@ -26,11 +26,24 @@ type OAuthConfig struct {
 }
 
 // NewClient creates a new USCIS API client
-func NewClient(baseURL string, oauthConfig *OAuthConfig) *Client {
+func NewClient(baseURL string, oauthConfig *OAuthConfig) (*Client, error) {
+	if oauthConfig == nil {
+		return nil, fmt.Errorf("oauthConfig cannot be nil")
+	}
+	if oauthConfig.ClientID == "" {
+		return nil, fmt.Errorf("oauthConfig.ClientID cannot be empty")
+	}
+	if oauthConfig.ClientSecret == "" {
+		return nil, fmt.Errorf("oauthConfig.ClientSecret cannot be empty")
+	}
+	if oauthConfig.TokenURL == "" {
+		return nil, fmt.Errorf("oauthConfig.TokenURL cannot be empty")
+	}
+
 	return &Client{
 		httpClient:  httpclient.NewClient(baseURL, 30*time.Second),
 		oauthConfig: oauthConfig,
-	}
+	}, nil
 }
 
 // OAuthTokenResponse represents the OAuth token response
@@ -54,6 +67,10 @@ type CaseStatusResponse struct {
 
 // GetOAuthToken obtains an OAuth token from USCIS
 func (c *Client) GetOAuthToken(ctx context.Context) (*types.OAuthToken, error) {
+	if c.oauthConfig == nil {
+		return nil, fmt.Errorf("oauthConfig is nil: client not properly initialized")
+	}
+
 	// Prepare OAuth request
 	oauthReq := &httpclient.Request{
 		Method: "POST",
@@ -137,6 +154,10 @@ func (c *Client) GetCaseStatus(ctx context.Context, caseNumber string, token *ty
 
 // RefreshOAuthToken refreshes an OAuth token
 func (c *Client) RefreshOAuthToken(ctx context.Context, refreshToken string) (*types.OAuthToken, error) {
+	if c.oauthConfig == nil {
+		return nil, fmt.Errorf("oauthConfig is nil: client not properly initialized")
+	}
+
 	// Prepare refresh request
 	refreshReq := &httpclient.Request{
 		Method: "POST",

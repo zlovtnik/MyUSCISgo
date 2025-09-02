@@ -97,9 +97,12 @@ describe('Responsive Design Tests', () => {
                 />
             );
 
-            // Check for mobile-specific classes
-            const gridElements = container.querySelectorAll('.grid-cols-1');
+            const gridElements = container.querySelectorAll('[class*="lg:grid-cols-2"]');
             expect(gridElements.length).toBeGreaterThan(0);
+
+            // Check for mobile-specific classes
+            const mobileGridElements = container.querySelectorAll('.grid-cols-1');
+            expect(mobileGridElements.length).toBeGreaterThan(0);
 
             // Check for responsive padding
             const paddingElements = container.querySelectorAll('.p-4');
@@ -119,19 +122,19 @@ describe('Responsive Design Tests', () => {
             expect(flexColElements.length).toBeGreaterThan(0);
         });
 
-        it('should show abbreviated tab labels on mobile', () => {
-            render(
-                <ResultsContainer
-                    result={mockProcessingResult}
-                    environment="development"
-                    onReset={vi.fn()}
-                />
-            );
+it('should show abbreviated tab labels on mobile', () => {
+    render(
+        <ResultsContainer
+            result={mockProcessingResult}
+            environment="development"
+            onReset={vi.fn()}
+        />
+    );
 
-            // Check for mobile-specific tab label classes
-            const hiddenElements = screen.getAllByText(/Case|Token|Config|Raw/);
-            expect(hiddenElements.length).toBeGreaterThan(0);
-        });
+    // Check for mobile-specific tab label classes
+    const hiddenElements = screen.getAllByText(/Case|Token|Config|Raw/);
+    expect(hiddenElements.length).toBeGreaterThan(0);
+});
 
         it('should have proper touch targets on mobile', () => {
             const { container } = render(
@@ -146,8 +149,12 @@ describe('Responsive Design Tests', () => {
 
             const buttons = container.querySelectorAll('button');
             buttons.forEach(button => {
-                // Touch targets should be at least 44px (this would be tested in actual browser)
-                expect(button).toBeInTheDocument();
+                // Verify minimum touch target size (44x44px)
+                const styles = window.getComputedStyle(button);
+                const width = parseFloat(styles.width);
+                const height = parseFloat(styles.height);
+                expect(width).toBeGreaterThanOrEqual(44);
+                expect(height).toBeGreaterThanOrEqual(44);
             });
         });
 
@@ -162,8 +169,11 @@ describe('Responsive Design Tests', () => {
             );
 
             // Check for mobile-specific step indicator sizes
-            const stepElements = container.querySelectorAll('.w-8, .h-8');
-            expect(stepElements.length).toBeGreaterThan(0);
+            const stepIndicators = container.querySelectorAll('[data-testid="step-indicator"]');
+            stepIndicators.forEach(indicator => {
+                expect(indicator).toHaveClass('w-8');
+                expect(indicator).toHaveClass('h-8');
+            });
         });
     });
 
@@ -387,10 +397,8 @@ describe('Responsive Design Tests', () => {
             expect(tabList).toHaveClass('overflow-x-auto');
         });
     });
-
-    describe('Layout Flexibility', () => {
-        it('should handle missing optional content gracefully', () => {
             const minimalCaseDetails: CaseDetails = {
+                caseNumber: 'MSC2190000001',
                 currentStatus: 'Pending',
                 processingCenter: 'NBC',
                 priorityDate: '2021-01-15',

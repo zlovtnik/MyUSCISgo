@@ -273,45 +273,6 @@ func (p *Processor) processWithContext(ctx context.Context, creds *types.Credent
 	return createSafeResult(result), nil
 }
 
-// addEnvironmentSpecificProcessing adds environment-specific logic
-func (p *Processor) addEnvironmentSpecificProcessing(ctx context.Context, result *types.ProcessingResult, env string) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
-
-	switch types.ToEnvironment(env) {
-	case types.EnvDevelopment:
-		// Development: Add mock API simulation
-		result.Config["mockAPI"] = "true"
-		result.Config["logLevel"] = "debug"
-		result.Config["features"] = "all"
-
-	case types.EnvStaging:
-		// Staging: Add testing features
-		result.Config["mockAPI"] = "false"
-		result.Config["logLevel"] = "info"
-		result.Config["features"] = "most"
-		result.Config["testMode"] = "true"
-
-	case types.EnvProduction:
-		// Production: Add security and performance features
-		result.Config["mockAPI"] = "false"
-		result.Config["logLevel"] = "warn"
-		result.Config["features"] = "essential"
-		result.Config["security"] = "enhanced"
-		result.Config["monitoring"] = "enabled"
-	}
-
-	p.logger.Debug("Environment-specific processing completed", map[string]interface{}{
-		"environment": env,
-		"configKeys":  len(result.Config),
-	})
-
-	return nil
-}
-
 // CallUSCISAPI makes real API calls to USCIS instead of simulation
 func (p *Processor) CallUSCISAPI(ctx context.Context, result *types.ProcessingResult, creds *types.Credentials) error {
 	// Create USCIS client for the environment

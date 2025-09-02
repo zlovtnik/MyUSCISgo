@@ -39,7 +39,7 @@ export default tseslint.config([
   },
   // Override for problematic test files to use JavaScript parser
   {
-    files: ['src/test/integration.wasm.test.ts', 'src/test/performance.test.ts'],
+    files: ['src/test/integration.wasm.test.tsx', 'src/test/performance.test.tsx'],
     languageOptions: {
       parserOptions: {
         ecmaVersion: 2020,

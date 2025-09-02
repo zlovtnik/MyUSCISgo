@@ -17,7 +17,7 @@ import { RealtimeUpdatesDisplay } from './components/RealtimeUpdatesDisplay';
 import { EnvironmentIndicator } from './components/EnvironmentIndicator';
 
 function AppContent() {
-  const [currentPage, setCurrentPage] = useState<Page>('credentials');
+  const [currentPage, setCurrentPage] = useState<Page>('home');
   const [result, setResult] = useState<ProcessingResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentEnvironment, setCurrentEnvironment] = useState<Environment>('development');
@@ -219,6 +219,89 @@ function AppContent() {
   const renderCurrentPage = () => {
     if (process.env.NODE_ENV !== 'production') console.debug('Rendering page, current result:', result);
     switch (currentPage) {
+      case 'home':
+        return (
+          <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+            <div className="container mx-auto px-4 py-16">
+              <div className="max-w-6xl mx-auto text-center">
+                {/* Hero Section */}
+                <div className="mb-16">
+                  <div className="inline-block p-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full mb-8">
+                    <span className="text-6xl">🚀</span>
+                  </div>
+                  <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
+                    Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">MyUSCISgo</span>
+                  </h1>
+                  <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto">
+                    Secure, fast, and reliable USCIS API tools powered by WebAssembly.
+                    Process your credentials and certify tokens with confidence.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button
+                      onClick={() => handlePageChange('credentials')}
+                      className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-4 px-8 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200"
+                    >
+                      🔐 Start Processing Credentials
+                    </button>
+                    <button
+                      onClick={() => handlePageChange('certification')}
+                      className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold py-4 px-8 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-200"
+                    >
+                      ✅ Token Certification
+                    </button>
+                  </div>
+                </div>
+
+                {/* Features Section */}
+                <div className="grid md:grid-cols-3 gap-8 mb-16">
+                  <div className="bg-white rounded-xl shadow-lg p-8 transform hover:scale-105 transition-all duration-200">
+                    <div className="text-4xl mb-4">🔒</div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">Secure Processing</h3>
+                    <p className="text-gray-600">
+                      Your credentials are processed locally using WebAssembly. Nothing is stored on our servers.
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-lg p-8 transform hover:scale-105 transition-all duration-200">
+                    <div className="text-4xl mb-4">⚡</div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">Lightning Fast</h3>
+                    <p className="text-gray-600">
+                      Optimized performance with WebAssembly ensures quick processing and minimal wait times.
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-lg p-8 transform hover:scale-105 transition-all duration-200">
+                    <div className="text-4xl mb-4">🛡️</div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">Privacy First</h3>
+                    <p className="text-gray-600">
+                      Your data stays on your device. We prioritize your privacy and security above all else.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Call to Action */}
+                <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white">
+                  <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
+                  <p className="text-xl mb-6 opacity-90">
+                    Choose your tool and begin processing your USCIS data securely.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button
+                      onClick={() => handlePageChange('credentials')}
+                      className="bg-white text-blue-600 hover:bg-gray-100 font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
+                    >
+                      Process Credentials →
+                    </button>
+                    <button
+                      onClick={() => handlePageChange('certification')}
+                      className="bg-white text-purple-600 hover:bg-gray-100 font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
+                    >
+                      Certify Tokens →
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
       case 'credentials':
         return (
           <div className="min-h-screen bg-gray-50">

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { KeyboardEvent } from 'react';
 
-export type Page = 'credentials' | 'certification';
+export type Page = 'home' | 'credentials' | 'certification';
 
 interface MenuProps {
   readonly currentPage: Page;
@@ -12,6 +12,7 @@ export function Menu({ currentPage, onPageChange }: MenuProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const menuItems = [
+    { id: 'home' as Page, label: 'Home', icon: '🏠' },
     { id: 'credentials' as Page, label: 'Credential Processor', icon: '🔐' },
     { id: 'certification' as Page, label: 'Token Certification', icon: '✅' },
   ];

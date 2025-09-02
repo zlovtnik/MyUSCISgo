@@ -14,16 +14,6 @@ import (
 	"MyUSCISgo/pkg/validation"
 )
 
-// MockJSValue simulates js.Value for non-WASM builds
-type MockJSValue struct {
-	value interface{}
-}
-
-// MockJSFunc simulates js.FuncOf for non-WASM builds
-type MockJSFunc struct {
-	fn func()
-}
-
 // Handler handles WASM function calls from JavaScript (mock version for non-WASM builds)
 type Handler struct {
 	processor *processing.Processor

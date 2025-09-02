@@ -18,7 +18,7 @@ PROJECT_NAME := MyUSCISgo
 DOCKER_REGISTRY := ghcr.io
 DOCKER_REPO := zlovtnik/MyUSCISgo
 DOCKER_TAG := $(shell git rev-parse --short HEAD 2>/dev/null || echo "latest")
-GO_VERSION := 1.21
+GO_VERSION := 1.25
 NODE_VERSION := 20
 
 # Environment variables (only for WASM builds)

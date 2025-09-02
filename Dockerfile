@@ -8,43 +8,35 @@ RUN apk add --no-cache git ca-certificates
 # Set working directory
 WORKDIR /app/go
 
-# Copy go mod and sum files (handle missing go.sum gracefully)
-COPY go/go.mod* go/go.sum* ./
-
-# Ensure go.sum exists (generate if missing)
-RUN if [ ! -f go.sum ]; then go mod tidy; fi
+# Copy go.mod to bootstrap
+COPY go/go.mod ./
 
 # Download dependencies
 RUN go mod download
 
-# Copy the source code
+# Copy the rest of the source code
 COPY go/ .
+
+# Regenerate go.sum if needed
+RUN go mod tidy
 
 # Build WASM
 RUN GOOS=js GOARCH=wasm go build -o /app/main.wasm -ldflags="-s -w" -trimpath
 
 # Copy wasm_exec.js (location varies across Go versions)
-RUN set -e && \
-    GOROOT=$(go env GOROOT) && \
-    # Try common paths in order of preference \
+RUN set -e; \
+    GOROOT=$(go env GOROOT); \
     if [ -f "$GOROOT/lib/wasm/wasm_exec.js" ]; then \
         cp "$GOROOT/lib/wasm/wasm_exec.js" /app/wasm_exec.js; \
     elif [ -f "$GOROOT/misc/wasm/wasm_exec.js" ]; then \
         cp "$GOROOT/misc/wasm/wasm_exec.js" /app/wasm_exec.js; \
     else \
-        # Fallback: search dynamically \
-        WASM_EXEC_PATH=$(find "$GOROOT" -name "wasm_exec.js" -type f 2>/dev/null | head -1) && \
-        if [ -n "$WASM_EXEC_PATH" ]; then \
-            cp "$WASM_EXEC_PATH" /app/wasm_exec.js; \
-        else \
-            echo "Error: wasm_exec.js not found in Go installation at $GOROOT" >&2 && \
-            echo "Searched in: $GOROOT/lib/wasm/, $GOROOT/misc/wasm/, and subdirectories" >&2 && \
-            exit 1; \
-        fi \
+        echo "wasm_exec.js not found" >&2; \
+        exit 1; \
     fi
 
-# React build stage
-FROM node:20-alpine AS react-builder
+# Astro build stage
+FROM node:20-alpine AS astro-builder
 
 WORKDIR /app/frontend
 
@@ -80,8 +72,8 @@ RUN npm ci --omit=dev --omit=optional && npm cache clean --force
 # FROM node:20-alpine AS runtime
 # WORKDIR /app/frontend
 # COPY --from=production-deps /app/frontend/node_modules ./node_modules
-# COPY --from=react-builder /app/frontend/dist ./dist
-# COPY --from=react-builder /app/frontend/package*.json ./
+# COPY --from=astro-builder /app/frontend/dist ./dist
+# COPY --from=astro-builder /app/frontend/package*.json ./
 # EXPOSE 3000
 # CMD ["npm", "run", "preview"]
 FROM nginx:alpine
@@ -92,8 +84,8 @@ FROM nginx:alpine
 # Copy custom nginx configuration
 COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy built application from react-builder stage
-COPY --from=react-builder /app/frontend/dist /usr/share/nginx/html
+# Copy built application from astro-builder stage
+COPY --from=astro-builder /app/frontend/dist /usr/share/nginx/html
 
 # Copy WASM files
 COPY --from=go-builder /app/main.wasm /usr/share/nginx/html/

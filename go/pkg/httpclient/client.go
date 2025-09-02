@@ -80,7 +80,13 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			// In a production system, you might want to log this error
+			// For now, we silently ignore it as the main operation might have succeeded
+			_ = closeErr // Explicitly ignore the error to satisfy linter
+		}
+	}()
 
 	// Read response body
 	bodyBytes, err := io.ReadAll(resp.Body)
