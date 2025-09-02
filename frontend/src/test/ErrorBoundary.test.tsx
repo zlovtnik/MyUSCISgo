@@ -309,7 +309,7 @@ describe('ErrorBoundary', () => {
       }
     ];
 
-    testCases.forEach(({ error, expectedCategory }) => {
+    testCases.forEach(({ error }) => {
       consoleErrorSpy.mockClear(); // Clear previous calls
       
       const { unmount } = render(
@@ -378,7 +378,7 @@ describe('ErrorBoundary', () => {
     
     expect(errorCall).toBeTruthy();
     if (errorCall) {
-      const enhancedError = errorCall[1];
+      const enhancedError = errorCall[1] as EnhancedError;
       expect(enhancedError).toHaveProperty('message', 'Original error message');
       expect(enhancedError).toHaveProperty('category');
       expect(enhancedError).toHaveProperty('retryable');

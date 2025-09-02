@@ -1,8 +1,7 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import CaseDetailsView from '../components/results/CaseDetailsView';
-import { CaseDetails, Environment } from '../types';
+import type { CaseDetails } from '../types';
 
 // Mock data for testing
 const mockCaseDetails: CaseDetails = {

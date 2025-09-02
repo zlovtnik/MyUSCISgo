@@ -4,11 +4,11 @@ import { axe, toHaveNoViolations } from 'jest-axe';
 import userEvent from '@testing-library/user-event';
 import App from '../App';
 import { CaseDetailsView } from '../components/results/CaseDetailsView';
-import { TokenStatusView } from '../components/results/TokenStatusView';
+import TokenStatusView from '../components/results/TokenStatusView';
 import { ProcessingIndicator } from '../components/ProcessingIndicator';
 import { ResultsContainer } from '../components/results/ResultsContainer';
 import { EnvironmentIndicator } from '../components/EnvironmentIndicator';
-import type { CaseDetails, OAuthToken, ProcessingResult, ProcessingStep, RealtimeUpdate } from '../types';
+import type { CaseDetails, OAuthToken, ProcessingResult, RealtimeUpdate } from '../types';
 
 // Extend Jest matchers
 expect.extend(toHaveNoViolations);
@@ -161,7 +161,7 @@ describe('Enhanced Accessibility Tests', () => {
   let mockTerminate: any;
   let mockAddEventListener: any;
   let mockRemoveEventListener: any;
-  let messageHandlers: Map<string, Function>;
+  let messageHandlers: Map<string, (event: any) => void>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -284,7 +284,7 @@ describe('Enhanced Accessibility Tests', () => {
 
     it('should support keyboard navigation through results tabs', async () => {
       const user = userEvent.setup();
-      const { container } = render(<App />);
+      render(<App />);
       
       simulateWorkerMessage('initialized');
       
@@ -385,7 +385,6 @@ describe('Enhanced Accessibility Tests', () => {
       );
 
       if (focusableElements.length > 0) {
-        const firstElement = focusableElements[0] as HTMLElement;
         const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
 
         // Focus should cycle within the component

@@ -1,13 +1,11 @@
 import React, { memo, useMemo } from 'react';
 
 interface LazyJsonViewerProps {
-  data: any;
   formattedJson: string;
   className?: string;
 }
 
 const LazyJsonViewer: React.FC<LazyJsonViewerProps> = memo(({ 
-  data, 
   formattedJson, 
   className = '' 
 }) => {
@@ -18,7 +16,7 @@ const LazyJsonViewer: React.FC<LazyJsonViewerProps> = memo(({
     return (
       <pre className="text-sm overflow-x-auto">
         {lines.map((line, lineIndex) => (
-          <div key={`line-${lineIndex}`} className="leading-relaxed">
+          <div key={`json-line-${lineIndex}-${line.substring(0, 10)}`} className="leading-relaxed">
             <span className="text-gray-500 mr-4 select-none">
               {String(lineIndex + 1).padStart(3, ' ')}
             </span>
@@ -66,16 +64,15 @@ const LazyJsonViewer: React.FC<LazyJsonViewerProps> = memo(({
   }, [formattedJson]);
 
   return (
-    <div 
+    <section 
       className={className}
-      role="region"
       aria-labelledby="raw-data-heading"
       aria-label="JSON formatted response data"
     >
       <div className="text-gray-300 text-sm">
         {highlightedJson}
       </div>
-    </div>
+    </section>
   );
 });
 

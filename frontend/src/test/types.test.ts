@@ -3,7 +3,6 @@ import {
   isOAuthToken,
   isCaseDetails,
   isProcessingMetadata,
-  isProcessingResult,
   isRealtimeUpdate,
   validateProcessingResult,
   validateOAuthToken,

@@ -123,7 +123,7 @@ export const sanitizeForLogging = (data: any): any => {
     }
     
     for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
+      if (Object.hasOwn(obj, key)) {
         const lowerKey = key.toLowerCase();
         
         // List of sensitive field patterns
@@ -177,7 +177,7 @@ export const validateMaskedData = (data: any): {
     }
     
     for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
+      if (Object.hasOwn(obj, key)) {
         const currentPath = path ? `${path}.${key}` : key;
         const lowerKey = key.toLowerCase();
         
@@ -314,7 +314,7 @@ export const sanitizeErrorMessage = (error: Error | string): string => {
   }
   
   // Remove common sensitive patterns from error messages
-  let sanitized = message
+  const sanitized = message
     .replace(/token[=:]\s*[A-Za-z0-9+/=]+/gi, 'token=[REDACTED]')
     .replace(/secret[=:]\s*[A-Za-z0-9+/=]+/gi, 'secret=[REDACTED]')
     .replace(/password[=:]\s*[A-Za-z0-9+/=]+/gi, 'password=[REDACTED]')

@@ -1,13 +1,11 @@
 import type { 
   Credentials, 
-  Environment, 
-  OAuthToken, 
-  CaseDetails, 
-  ProcessingMetadata,
-  ProcessingResult,
-  RealtimeUpdate,
+  Environment,
+  OAuthToken,
+  CaseDetails,
   ProcessingStep
 } from '../types';
+import { validateProcessingResult as typesValidateProcessingResult, validateOAuthToken as typesValidateOAuthToken, validateCaseDetails as typesValidateCaseDetails } from '../types';
 
 /**
  * Enhanced validation result interface
@@ -139,7 +137,7 @@ export const validateClientSecret = (clientSecret: string): ValidationResult => 
   const hasLowercase = /[a-z]/.test(trimmed);
   const hasUppercase = /[A-Z]/.test(trimmed);
   const hasNumber = /\d/.test(trimmed);
-  const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(trimmed);
+  const hasSpecialChar = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>?]/.test(trimmed);
   
   if (!hasLowercase && !hasUppercase) {
     errors.push('Client Secret must contain at least one letter');
@@ -205,7 +203,7 @@ export const validateEnvironment = (environment: string): ValidationResult => {
 /**
  * Enhanced OAuth token validation
  */
-export const validateOAuthTokenEnhanced = (token: any): ValidationResult => {
+export const validateOAuthTokenEnhanced = (token: Partial<OAuthToken>): ValidationResult => {
   const errors: string[] = [];
   const warnings: string[] = [];
   
@@ -283,7 +281,7 @@ export const validateOAuthTokenEnhanced = (token: any): ValidationResult => {
 /**
  * Enhanced case details validation
  */
-export const validateCaseDetailsEnhanced = (caseDetails: any): ValidationResult => {
+export const validateCaseDetailsEnhanced = (caseDetails: Partial<CaseDetails>): ValidationResult => {
   const errors: string[] = [];
   const warnings: string[] = [];
   
@@ -591,7 +589,7 @@ export const validateJsonString = (jsonString: string): ValidationResult => {
  * Enhanced ProcessingResult validation (wrapper for existing function)
  */
 export const validateProcessingResult = (result: any): ValidationResult => {
-  const validation = require('../types').validateProcessingResult(result);
+  const validation = typesValidateProcessingResult(result);
   return {
     isValid: validation.isValid,
     errors: validation.errors,
@@ -603,7 +601,7 @@ export const validateProcessingResult = (result: any): ValidationResult => {
  * Enhanced OAuthToken validation (wrapper for existing function)
  */
 export const validateOAuthToken = (token: any): ValidationResult => {
-  const validation = require('../types').validateOAuthToken(token);
+  const validation = typesValidateOAuthToken(token);
   return {
     isValid: validation.isValid,
     errors: validation.errors,
@@ -615,7 +613,7 @@ export const validateOAuthToken = (token: any): ValidationResult => {
  * Enhanced CaseDetails validation (wrapper for existing function)
  */
 export const validateCaseDetails = (caseDetails: any): ValidationResult => {
-  const validation = require('../types').validateCaseDetails(caseDetails);
+  const validation = typesValidateCaseDetails(caseDetails);
   return {
     isValid: validation.isValid,
     errors: validation.errors,

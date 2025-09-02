@@ -57,14 +57,13 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
   const statusInfo = getStatusInfo(status);
 
   return (
-    <span 
+    <output 
       className={`inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium border ${statusInfo.color}`}
-      role="status"
       aria-label={`${statusInfo.description}: ${status}`}
     >
       <span className="mr-1 sm:mr-2" aria-hidden="true">{statusInfo.icon}</span>
       <span className="truncate max-w-[120px] sm:max-w-none">{status}</span>
-    </span>
+    </output>
   );
 };
 
@@ -72,13 +71,14 @@ const formatRelativeTime = (dateString: string): string => {
   try {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) {
-      return dateString; // Return original string if invalid date
+      return dateString;
     }
-    
+
     const now = new Date();
     const diffInMs = now.getTime() - date.getTime();
     const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-    
+
+    // Handle different time ranges
     if (diffInDays === 0) {
       const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
       if (diffInHours === 0) {
@@ -87,46 +87,37 @@ const formatRelativeTime = (dateString: string): string => {
       }
       return diffInHours === 1 ? '1 hour ago' : `${diffInHours} hours ago`;
     }
-    
-    if (diffInDays === 1) {
-      return 'Yesterday';
-    }
-    
-    if (diffInDays < 7) {
-      return `${diffInDays} days ago`;
-    }
-    
+
+    if (diffInDays === 1) return 'Yesterday';
+    if (diffInDays < 7) return `${diffInDays} days ago`;
+
     if (diffInDays < 30) {
       const weeks = Math.floor(diffInDays / 7);
       return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`;
     }
-    
+
     if (diffInDays < 365) {
       const months = Math.floor(diffInDays / 30);
       return months === 1 ? '1 month ago' : `${months} months ago`;
     }
-    
+
     const years = Math.floor(diffInDays / 365);
     return years === 1 ? '1 year ago' : `${years} years ago`;
-  } catch (error) {
-    return dateString; // Fallback to original string if parsing fails
+  } catch {
+    return dateString;
   }
 };
 
 const formatDate = (dateString: string): string => {
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      return dateString; // Return original string if invalid date
-    }
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  } catch (error) {
-    return dateString; // Fallback to original string if parsing fails
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) {
+    return dateString;
   }
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
 };
 
 export const CaseDetailsView: React.FC<CaseDetailsViewProps> = ({ 
@@ -134,9 +125,8 @@ export const CaseDetailsView: React.FC<CaseDetailsViewProps> = ({
   environment 
 }) => {
   return (
-    <div 
+    <section 
       className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6"
-      role="region"
       aria-labelledby="case-details-heading"
     >
       <div className="space-y-4 sm:space-y-6">
@@ -165,16 +155,13 @@ export const CaseDetailsView: React.FC<CaseDetailsViewProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Processing Center */}
           <div className="space-y-2">
-            <label 
+            <span 
               className="text-sm font-medium text-gray-700"
-              id="processing-center-label"
             >
               Processing Center
-            </label>
+            </span>
             <div 
               className="text-sm text-gray-900 bg-gray-50 rounded-md px-3 py-2"
-              role="text"
-              aria-labelledby="processing-center-label"
             >
               {caseDetails.processingCenter}
             </div>
@@ -182,16 +169,13 @@ export const CaseDetailsView: React.FC<CaseDetailsViewProps> = ({
 
           {/* Case Type */}
           <div className="space-y-2">
-            <label 
+            <span 
               className="text-sm font-medium text-gray-700"
-              id="case-type-label"
             >
               Case Type
-            </label>
+            </span>
             <div 
               className="text-sm text-gray-900 bg-gray-50 rounded-md px-3 py-2"
-              role="text"
-              aria-labelledby="case-type-label"
             >
               {caseDetails.caseType}
             </div>
@@ -199,23 +183,17 @@ export const CaseDetailsView: React.FC<CaseDetailsViewProps> = ({
 
           {/* Priority Date */}
           <div className="space-y-2">
-            <label 
+            <span 
               className="text-sm font-medium text-gray-700"
-              id="priority-date-label"
             >
               Priority Date
-            </label>
+            </span>
             <div 
               className="text-sm text-gray-900 bg-gray-50 rounded-md px-3 py-2"
-              role="text"
-              aria-labelledby="priority-date-label"
-              aria-describedby="priority-date-relative"
             >
               <p>{formatDate(caseDetails.priorityDate)}</p>
               <p 
-                id="priority-date-relative"
                 className="text-xs text-gray-500 mt-1"
-                aria-label={`Priority date was ${formatRelativeTime(caseDetails.priorityDate)}`}
               >
                 {formatRelativeTime(caseDetails.priorityDate)}
               </p>
@@ -225,25 +203,19 @@ export const CaseDetailsView: React.FC<CaseDetailsViewProps> = ({
           {/* Approval Date (if available) */}
           {caseDetails.approvalDate && (
             <div className="space-y-2">
-              <label 
+              <span 
                 className="text-sm font-medium text-gray-700"
-                id="approval-date-label"
               >
                 Approval Date
-              </label>
+              </span>
               <div 
                 className="text-sm text-gray-900 bg-green-50 rounded-md px-3 py-2 border border-green-200"
-                role="text"
-                aria-labelledby="approval-date-label"
-                aria-describedby="approval-date-relative"
               >
                 <p className="font-medium text-green-800">
                   {formatDate(caseDetails.approvalDate)}
                 </p>
                 <p 
-                  id="approval-date-relative"
                   className="text-xs text-green-600 mt-1"
-                  aria-label={`Approved ${formatRelativeTime(caseDetails.approvalDate)}`}
                 >
                   {formatRelativeTime(caseDetails.approvalDate)}
                 </p>
@@ -290,7 +262,7 @@ export const CaseDetailsView: React.FC<CaseDetailsViewProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 

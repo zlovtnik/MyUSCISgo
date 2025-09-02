@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { CaseDetailsView } from '../components/results/CaseDetailsView';
-import { TokenStatusView } from '../components/results/TokenStatusView';
+import TokenStatusView from '../components/results/TokenStatusView';
 import { ProcessingIndicator } from '../components/ProcessingIndicator';
 import { ResultsContainer } from '../components/results/ResultsContainer';
 import { EnvironmentIndicator } from '../components/EnvironmentIndicator';
@@ -146,7 +146,6 @@ describe('Responsive Design Tests', () => {
 
             const buttons = container.querySelectorAll('button');
             buttons.forEach(button => {
-                const styles = window.getComputedStyle(button);
                 // Touch targets should be at least 44px (this would be tested in actual browser)
                 expect(button).toBeInTheDocument();
             });

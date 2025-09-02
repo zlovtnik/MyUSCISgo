@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useWasm } from '../hooks/useWasm';
-import type { Credentials, WASMResponse, TokenCertificationResult } from '../types';
+import type { Credentials } from '../types';
 
 // Mock the data transform utilities
 vi.mock('../utils/dataTransform', () => ({

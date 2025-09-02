@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom';
 import { configure } from '@testing-library/react';
 import { toHaveNoViolations } from 'jest-axe';
+import { vi } from 'vitest';
 
 // Extend Jest matchers for accessibility testing
 expect.extend(toHaveNoViolations);
@@ -14,8 +15,8 @@ configure({
   asyncUtilTimeout: 5000,
   
   // Configure getBy* queries to be more accessible
-  getElementError: (message, container) => {
-    const error = new Error(message);
+  getElementError: (message) => {
+    const error = new Error(message || 'Element not found');
     error.name = 'TestingLibraryElementError';
     return error;
   }
@@ -23,18 +24,20 @@ configure({
 
 // Mock IntersectionObserver for components that use it
 global.IntersectionObserver = class IntersectionObserver {
-  constructor() {}
-  disconnect() {}
-  observe() {}
-  unobserve() {}
+  root = null;
+  rootMargin = '';
+  thresholds = [];
+  disconnect() { return; }
+  observe() { return; }
+  unobserve() { return; }
+  takeRecords() { return []; }
 };
 
 // Mock ResizeObserver for responsive components
 global.ResizeObserver = class ResizeObserver {
-  constructor() {}
-  disconnect() {}
-  observe() {}
-  unobserve() {}
+  disconnect() { return; }
+  observe() { return; }
+  unobserve() { return; }
 };
 
 // Mock matchMedia for responsive design testing
@@ -133,9 +136,8 @@ export const accessibilityTestUtils = {
     const focusableElements = accessibilityTestUtils.getFocusableElements(container);
     const tabOrder: HTMLElement[] = [];
     
-    for (let i = 0; i < focusableElements.length; i++) {
-      const element = focusableElements[i] as HTMLElement;
-      element.focus();
+    for (const element of focusableElements) {
+      (element as HTMLElement).focus();
       tabOrder.push(document.activeElement as HTMLElement);
     }
     
@@ -158,10 +160,9 @@ export const accessibilityTestUtils = {
   
   // Check for proper ARIA attributes
   checkAriaAttributes: (element: HTMLElement) => {
-    const ariaAttributes = {};
+    const ariaAttributes: Record<string, string> = {};
     
-    for (let i = 0; i < element.attributes.length; i++) {
-      const attr = element.attributes[i];
+    for (const attr of element.attributes) {
       if (attr.name.startsWith('aria-')) {
         ariaAttributes[attr.name] = attr.value;
       }
@@ -205,9 +206,8 @@ export const accessibilityTestUtils = {
     const focusableElements = accessibilityTestUtils.getFocusableElements(container);
     const navigation: { element: HTMLElement; announcement: string }[] = [];
     
-    for (let i = 0; i < focusableElements.length; i++) {
-      const element = focusableElements[i] as HTMLElement;
-      element.focus();
+    for (const element of focusableElements) {
+      (element as HTMLElement).focus();
       
       // Simulate what a screen reader would announce
       const role = element.getAttribute('role') || element.tagName.toLowerCase();
@@ -218,7 +218,7 @@ export const accessibilityTestUtils = {
                    element.getAttribute('title');
       
       const announcement = `${role}${label ? ': ' + label : ''}`;
-      navigation.push({ element, announcement });
+      navigation.push({ element: element as HTMLElement, announcement });
     }
     
     return navigation;

@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "erasableSyntaxOnly": false
+  },
+  "include": ["src/test/**/*", "src/**/*.test.*", "src/**/*.spec.*", "tests/**/*"]
+}

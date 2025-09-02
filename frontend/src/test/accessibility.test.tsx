@@ -2,11 +2,11 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { axe, toHaveNoViolations } from 'jest-axe';
 import { CaseDetailsView } from '../components/results/CaseDetailsView';
-import { TokenStatusView } from '../components/results/TokenStatusView';
+import TokenStatusView from '../components/results/TokenStatusView';
 import { ProcessingIndicator } from '../components/ProcessingIndicator';
 import { ResultsContainer } from '../components/results/ResultsContainer';
 import { EnvironmentIndicator } from '../components/EnvironmentIndicator';
-import type { CaseDetails, OAuthToken, ProcessingResult, ProcessingStep, RealtimeUpdate } from '../types';
+import type { CaseDetails, OAuthToken, ProcessingResult, RealtimeUpdate } from '../types';
 
 // Extend Jest matchers
 expect.extend(toHaveNoViolations);
@@ -257,7 +257,7 @@ describe('Accessibility Tests', () => {
       expect(tabList).toBeInTheDocument();
 
       const tabs = screen.getAllByRole('tab');
-      tabs.forEach((tab, index) => {
+      tabs.forEach((tab) => {
         expect(tab).toHaveAttribute('aria-selected');
         expect(tab).toHaveAttribute('aria-controls');
         expect(tab).toHaveAttribute('id');

@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 test.describe('Complete User Workflows', () => {
   test.beforeEach(async ({ page }) => {
@@ -16,7 +16,7 @@ test.describe('Complete User Workflows', () => {
 
       // Step 2: Submit form and verify processing starts
       await page.click('button[type="submit"]');
-      
+
       // Verify processing indicator appears
       await expect(page.getByTestId('processing-indicator')).toBeVisible();
       await expect(page.locator('button[type="submit"]')).toContainText('Processing...');
@@ -26,7 +26,7 @@ test.describe('Complete User Workflows', () => {
 
       // Step 4: Verify results container with tabs
       await expect(page.getByRole('tablist')).toBeVisible();
-      
+
       // Verify all expected tabs are present
       await expect(page.getByRole('tab', { name: /case details/i })).toBeVisible();
       await expect(page.getByRole('tab', { name: /token status/i })).toBeVisible();
@@ -36,7 +36,7 @@ test.describe('Complete User Workflows', () => {
       // Step 5: Verify case details tab content
       const caseDetailsTab = page.getByRole('tab', { name: /case details/i });
       await caseDetailsTab.click();
-      
+
       await expect(page.getByText(/case number/i)).toBeVisible();
       await expect(page.getByText(/current status/i)).toBeVisible();
       await expect(page.getByText(/processing center/i)).toBeVisible();
@@ -44,21 +44,21 @@ test.describe('Complete User Workflows', () => {
       // Step 6: Verify token status tab
       const tokenStatusTab = page.getByRole('tab', { name: /token status/i });
       await tokenStatusTab.click();
-      
+
       await expect(page.getByText(/token type/i)).toBeVisible();
       await expect(page.getByText(/expires/i)).toBeVisible();
 
       // Step 7: Verify configuration tab
       const configTab = page.getByRole('tab', { name: /configuration/i });
       await configTab.click();
-      
+
       await expect(page.getByText(/base url/i)).toBeVisible();
       await expect(page.getByText(/environment/i)).toBeVisible();
 
       // Step 8: Verify raw data tab with JSON
       const rawDataTab = page.getByRole('tab', { name: /raw data/i });
       await rawDataTab.click();
-      
+
       await expect(page.locator('pre')).toBeVisible();
       await expect(page.getByText(/"baseURL"/)).toBeVisible();
 
@@ -75,7 +75,7 @@ test.describe('Complete User Workflows', () => {
       await page.click('button[type="submit"]');
 
       await page.getByTestId('result').waitFor({ state: 'visible', timeout: 20000 });
-      
+
       // Verify development-specific content
       await expect(page.getByText('localhost:8080')).toBeVisible();
       await expect(page.getByTestId('environment-indicator')).toContainText('Development');
@@ -90,7 +90,7 @@ test.describe('Complete User Workflows', () => {
       await page.click('button[type="submit"]');
 
       await page.getByTestId('result').waitFor({ state: 'visible', timeout: 20000 });
-      
+
       // Verify staging-specific content
       await expect(page.getByText('staging.example.com')).toBeVisible();
       await expect(page.getByTestId('environment-indicator')).toContainText('Staging');
@@ -100,7 +100,7 @@ test.describe('Complete User Workflows', () => {
       await page.getByLabel('Client ID').fill('realtime-test');
       await page.getByLabel('Client Secret').fill('RealtimeSecret123');
       await page.getByLabel('Environment').selectOption('development');
-      
+
       await page.click('button[type="submit"]');
 
       // Verify processing indicator with steps
@@ -152,7 +152,7 @@ test.describe('Complete User Workflows', () => {
       await page.getByLabel('Client ID').fill('network-error-test');
       await page.getByLabel('Client Secret').fill('NetworkErrorSecret');
       await page.getByLabel('Environment').selectOption('development');
-      
+
       await page.click('button[type="submit"]');
 
       // Wait for error to appear (this will depend on WASM implementation)
@@ -163,7 +163,7 @@ test.describe('Complete User Workflows', () => {
       const retryButton = page.getByRole('button', { name: /retry/i });
       if (await retryButton.isVisible()) {
         await retryButton.click();
-        
+
         // Verify retry attempt
         await expect(page.getByTestId('processing-indicator')).toBeVisible();
       }
@@ -174,7 +174,7 @@ test.describe('Complete User Workflows', () => {
       await page.getByLabel('Client ID').fill('timeout-test-client');
       await page.getByLabel('Client Secret').fill('TimeoutSecret123');
       await page.getByLabel('Environment').selectOption('development');
-      
+
       await page.click('button[type="submit"]');
 
       // Wait longer than normal timeout
@@ -193,16 +193,16 @@ test.describe('Complete User Workflows', () => {
     test('should support complete keyboard navigation', async ({ page }) => {
       // Start with first focusable element
       await page.keyboard.press('Tab');
-      
+
       // Navigate through form fields
       await expect(page.getByLabel('Client ID')).toBeFocused();
-      
+
       await page.keyboard.press('Tab');
       await expect(page.getByLabel('Client Secret')).toBeFocused();
-      
+
       await page.keyboard.press('Tab');
       await expect(page.getByLabel('Environment')).toBeFocused();
-      
+
       await page.keyboard.press('Tab');
       await expect(page.getByRole('button', { name: /submit/i })).toBeFocused();
 
@@ -210,7 +210,7 @@ test.describe('Complete User Workflows', () => {
       await page.keyboard.press('Shift+Tab'); // Back to environment
       await page.keyboard.press('Shift+Tab'); // Back to client secret
       await page.keyboard.press('Shift+Tab'); // Back to client ID
-      
+
       await page.keyboard.type('keyboard-test-client');
       await page.keyboard.press('Tab');
       await page.keyboard.type('KeyboardSecret123');
@@ -225,12 +225,12 @@ test.describe('Complete User Workflows', () => {
       // Navigate through result tabs using keyboard
       const tabs = page.getAllByRole('tab');
       const tabCount = await tabs.count();
-      
+
       for (let i = 0; i < tabCount; i++) {
         await page.keyboard.press('Tab');
         const focusedTab = page.locator(':focus');
         await expect(focusedTab).toHaveAttribute('role', 'tab');
-        
+
         // Activate tab with Enter or Space
         await page.keyboard.press('Enter');
         await expect(focusedTab).toHaveAttribute('aria-selected', 'true');
@@ -248,10 +248,10 @@ test.describe('Complete User Workflows', () => {
 
       // Verify ARIA labels and roles are present
       await expect(page.getByRole('tablist')).toHaveAttribute('aria-label');
-      
+
       const tabs = page.getAllByRole('tab');
       const tabCount = await tabs.count();
-      
+
       for (let i = 0; i < tabCount; i++) {
         const tab = tabs.nth(i);
         await expect(tab).toHaveAttribute('aria-controls');
@@ -261,7 +261,7 @@ test.describe('Complete User Workflows', () => {
       // Verify tab panels have proper labeling
       const tabPanels = page.getAllByRole('tabpanel');
       const panelCount = await tabPanels.count();
-      
+
       for (let i = 0; i < panelCount; i++) {
         const panel = tabPanels.nth(i);
         await expect(panel).toHaveAttribute('aria-labelledby');
@@ -278,19 +278,19 @@ test.describe('Complete User Workflows', () => {
 
       // Submit multiple times rapidly (should be prevented)
       const submitButton = page.getByRole('button', { name: /submit/i });
-      
+
       await submitButton.click();
       await expect(submitButton).toBeDisabled();
-      
+
       // Try to click again while processing
       await submitButton.click({ force: true });
-      
+
       // Should still be processing the first request
       await expect(page.getByTestId('processing-indicator')).toBeVisible();
-      
+
       // Wait for completion
       await page.getByTestId('result').waitFor({ state: 'visible', timeout: 20000 });
-      
+
       // Button should be re-enabled
       await expect(submitButton).not.toBeDisabled();
     });
@@ -300,25 +300,25 @@ test.describe('Complete User Workflows', () => {
       await page.getByLabel('Client ID').fill('large-dataset-test');
       await page.getByLabel('Client Secret').fill('LargeDataSecret123');
       await page.getByLabel('Environment').selectOption('development');
-      
+
       const startTime = Date.now();
       await page.click('button[type="submit"]');
 
       await page.getByTestId('result').waitFor({ state: 'visible', timeout: 20000 });
       const endTime = Date.now();
-      
+
       const processingTime = endTime - startTime;
-      
+
       // Should complete within reasonable time (20 seconds max)
       expect(processingTime).toBeLessThan(20000);
 
       // Verify UI remains responsive
       const rawDataTab = page.getByRole('tab', { name: /raw data/i });
       await rawDataTab.click();
-      
+
       // JSON should be displayed without freezing UI
       await expect(page.locator('pre')).toBeVisible();
-      
+
       // Should be able to scroll through large JSON
       await page.locator('pre').hover();
       await page.mouse.wheel(0, 500);
@@ -337,7 +337,7 @@ test.describe('Complete User Workflows', () => {
       await page.getByLabel('Client ID').fill('mobile-test-client');
       await page.getByLabel('Client Secret').fill('MobileSecret123');
       await page.getByLabel('Environment').selectOption('development');
-      
+
       // Submit and verify mobile processing
       await page.click('button[type="submit"]');
       await expect(page.getByTestId('processing-indicator')).toBeVisible();
@@ -348,10 +348,10 @@ test.describe('Complete User Workflows', () => {
       const tabs = page.getAllByRole('tab');
       const firstTab = tabs.first();
       await firstTab.click();
-      
+
       // Verify mobile-responsive content
       await expect(page.getByRole('tabpanel')).toBeVisible();
-      
+
       // Test mobile scrolling
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
       await page.evaluate(() => window.scrollTo(0, 0));
@@ -363,16 +363,16 @@ test.describe('Complete User Workflows', () => {
       await page.getByLabel('Client ID').fill('touch-test-client');
       await page.getByLabel('Client Secret').fill('TouchSecret123');
       await page.getByLabel('Environment').selectOption('development');
-      
+
       // Use touch to submit
       await page.getByRole('button', { name: /submit/i }).tap();
-      
+
       await page.getByTestId('result').waitFor({ state: 'visible', timeout: 20000 });
 
       // Test touch navigation through tabs
-      const tabs = page.getAllByRole('tab');
+      const tabs = page.getByRole('tab');
       const tabCount = await tabs.count();
-      
+
       for (let i = 0; i < tabCount; i++) {
         await tabs.nth(i).tap();
         await expect(tabs.nth(i)).toHaveAttribute('aria-selected', 'true');
@@ -396,7 +396,7 @@ test.describe('Complete User Workflows', () => {
       // Verify client ID and environment are preserved
       await expect(page.getByLabel('Client ID')).toHaveValue('persistence-test');
       await expect(page.getByLabel('Environment')).toHaveValue('staging');
-      
+
       // Client secret should be cleared for security
       await expect(page.getByLabel('Client Secret')).toHaveValue('');
     });
@@ -405,12 +405,12 @@ test.describe('Complete User Workflows', () => {
       await page.getByLabel('Client ID').fill('refresh-test');
       await page.getByLabel('Client Secret').fill('RefreshSecret123');
       await page.getByLabel('Environment').selectOption('development');
-      
+
       await page.click('button[type="submit"]');
-      
+
       // Refresh page during processing
       await page.reload();
-      
+
       // Should return to initial state
       await page.waitForSelector('button[type="submit"]', { timeout: 15000 });
       await expect(page.getByLabel('Client ID')).toHaveValue('');

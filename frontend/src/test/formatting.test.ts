@@ -13,7 +13,6 @@ import {
   truncateText,
   formatCaseNumber
 } from '../utils/formatting';
-import type { Environment } from '../types';
 
 describe('Formatting Utilities', () => {
   beforeEach(() => {

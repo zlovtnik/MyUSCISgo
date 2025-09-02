@@ -253,12 +253,12 @@ export const testUtils = {
   
   // Mock worker message simulation
   createWorkerMock: () => {
-    const messageHandlers = new Map<string, Function>();
+    const messageHandlers = new Map<string, (event: any) => void>();
     
     return {
       postMessage: vi.fn(),
       terminate: vi.fn(),
-      addEventListener: vi.fn((event: string, handler: Function) => {
+      addEventListener: vi.fn((event: string, handler: (event: any) => void) => {
         messageHandlers.set(event, handler);
       }),
       removeEventListener: vi.fn(),

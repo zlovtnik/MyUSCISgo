@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useWasm } from '../hooks/useWasm';
-import { createWASMError, createValidationError, globalRetryManager } from '../utils/errorHandling';
+import { createWASMError, globalRetryManager } from '../utils/errorHandling';
 import type { Credentials } from '../types';
 
 // Mock react-toastify
@@ -42,6 +42,7 @@ class MockWorker {
   
   removeEventListener() {}
   
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   simulateMessage(data: any) {
     // Override in tests to simulate different responses
   }

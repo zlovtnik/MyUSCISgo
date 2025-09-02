@@ -10,8 +10,6 @@ import {
   validateProcessingResult, 
   validateOAuthToken, 
   validateCaseDetails,
-  isOAuthToken,
-  isCaseDetails,
   isProcessingMetadata,
   isRealtimeUpdate
 } from '../types';
@@ -82,7 +80,9 @@ export const transformWASMOutput = (rawOutput: any): ProcessingResult => {
   if (transformCache.size >= CACHE_SIZE_LIMIT) {
     // Remove oldest entry
     const firstKey = transformCache.keys().next().value;
-    transformCache.delete(firstKey);
+    if (firstKey) {
+      transformCache.delete(firstKey);
+    }
   }
   transformCache.set(cacheKey, baseResult);
 
@@ -168,7 +168,7 @@ export const transformProcessingMetadata = (rawMetadata: any): ProcessingMetadat
     const metadata: ProcessingMetadata = {
       environment: String(rawMetadata.environment || 'development'),
       processingTime: Number(rawMetadata.processingTime || rawMetadata.processing_time || 0),
-      requestId: String(rawMetadata.requestId || rawMetadata.request_id || Math.random().toString(36).substr(2, 9)),
+      requestId: String(rawMetadata.requestId || rawMetadata.request_id || Math.random().toString(36).substring(2, 11)),
       timestamp: String(rawMetadata.timestamp || new Date().toISOString())
     };
 
@@ -195,7 +195,7 @@ export const transformRealtimeUpdate = (rawUpdate: any): RealtimeUpdate | null =
 
   try {
     const update: RealtimeUpdate = {
-      id: String(rawUpdate.id || Math.random().toString(36).substr(2, 9)),
+      id: String(rawUpdate.id || Math.random().toString(36).substring(2, 11)),
       timestamp: String(rawUpdate.timestamp || new Date().toISOString()),
       step: normalizeProcessingStep(rawUpdate.step || rawUpdate.stage || 'validating'),
       message: String(rawUpdate.message || rawUpdate.msg || ''),
@@ -313,7 +313,7 @@ export const deepClone = <T>(obj: T): T => {
   
   const cloned = {} as T;
   for (const key in obj) {
-    if (obj.hasOwnProperty(key)) {
+    if (Object.hasOwn(obj, key)) {
       cloned[key] = deepClone(obj[key]);
     }
   }
@@ -338,7 +338,7 @@ export const sanitizeForLogging = (obj: any): any => {
     }
 
     for (const key in target) {
-      if (target.hasOwnProperty(key)) {
+      if (Object.hasOwn(target, key)) {
         const lowerKey = key.toLowerCase();
         
         // Mask sensitive fields

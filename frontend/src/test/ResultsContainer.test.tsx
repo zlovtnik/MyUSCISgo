@@ -1,8 +1,7 @@
-import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import ResultsContainer from '../components/results/ResultsContainer';
-import type { ProcessingResult, Environment, OAuthToken, CaseDetails, ProcessingMetadata } from '../types';
+import type { ProcessingResult, OAuthToken, CaseDetails, ProcessingMetadata } from '../types';
 
 // Mock the child components
 vi.mock('../components/results/CaseDetailsView', () => ({

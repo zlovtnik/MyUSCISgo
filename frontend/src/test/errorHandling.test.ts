@@ -12,7 +12,6 @@ import {
   logError,
   withTimeout
 } from '../utils/errorHandling';
-import type { ErrorCategory } from '../components/error/ErrorBoundary';
 
 describe('Error Handling Utilities', () => {
   beforeEach(() => {

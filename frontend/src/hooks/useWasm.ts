@@ -1,19 +1,16 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { WASMResponse, Credentials, TokenCertificationResult, RealtimeUpdate, ProcessingResult } from '../types';
+import type { WASMResponse, Credentials, TokenCertificationResult, RealtimeUpdate } from '../types';
 import { toast } from 'react-toastify';
 import { 
   transformWASMOutput, 
   transformRealtimeUpdate, 
   sanitizeForLogging,
-  deepClone,
   clearTransformCache,
   getCacheStats
 } from '../utils/dataTransform';
 import {
   createWASMError,
-  createNetworkError,
   createValidationError,
-  createTokenRefreshError,
   globalRetryManager,
   isRetryableError,
   getUserFriendlyErrorMessage,
@@ -119,7 +116,7 @@ export function useWasm() {
                 caseDetails: result?.caseDetails && typeof result.caseDetails === 'object' 
                   ? result.caseDetails 
                   : {},
-                verificationId: String(result?.verificationId || Math.random().toString(36).substr(2, 9))
+                verificationId: String(result?.verificationId || Math.random().toString(36).substring(2, 11))
               };
               
               resolveCertify.resolve(enhancedResult);
@@ -147,7 +144,7 @@ export function useWasm() {
                 caseDetails: {
                   error: 'Failed to process certification result'
                 },
-                verificationId: Math.random().toString(36).substr(2, 9)
+                verificationId: Math.random().toString(36).substring(2, 11)
               };
               
               resolveCertify.resolve(fallbackResult);
@@ -304,7 +301,9 @@ export function useWasm() {
             'process',
             { code: 'WORKER_DISPOSED', retryable: false }
           )); 
-        } catch {}
+        } catch {
+          // Ignore errors when rejecting disposed requests
+        }
       }
       pendingRequestsRef.current.clear();
     };
@@ -534,7 +533,7 @@ export function useWasm() {
         caseDetails: {
           error: getUserFriendlyErrorMessage(error as Error)
         },
-        verificationId: Math.random().toString(36).substr(2, 9)
+        verificationId: Math.random().toString(36).substring(2, 11)
       };
       
       return errorResult;
@@ -647,7 +646,21 @@ export function useWasm() {
   const retryLastOperation = useCallback(async (operation: 'process' | 'certify' | 'health', data?: any) => {
     try {
       // Reset retry count for the specific operation
-      globalRetryManager.reset(`${operation}-${operation === 'process' ? 'credentials' : operation === 'certify' ? 'token' : 'check'}`);
+      let operationSuffix: string;
+      switch (operation) {
+        case 'process':
+          operationSuffix = 'credentials';
+          break;
+        case 'certify':
+          operationSuffix = 'token';
+          break;
+        case 'health':
+          operationSuffix = 'check';
+          break;
+        default:
+          operationSuffix = 'unknown';
+      }
+      globalRetryManager.reset(`${operation}-${operationSuffix}`);
       
       switch (operation) {
         case 'process':

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   transformWASMOutput,
   transformOAuthToken,
@@ -11,14 +11,7 @@ import {
   deepClone,
   sanitizeForLogging
 } from '../utils/dataTransform';
-import type { 
-  ProcessingResult, 
-  OAuthToken, 
-  CaseDetails, 
-  ProcessingMetadata,
-  RealtimeUpdate,
-  ProcessingStep
-} from '../types';
+
 
 describe('Data Transform Utilities', () => {
   describe('transformWASMOutput', () => {

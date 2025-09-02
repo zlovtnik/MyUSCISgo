@@ -63,7 +63,7 @@ func GenerateOAuthToken(ctx context.Context, clientID, clientSecret string) (*OA
 	default:
 	}
 
-	// Generate a secure access token
+	// For now, generate a mock token (will be replaced with real USCIS client)
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		return nil, fmt.Errorf("failed to generate token: %w", err)
