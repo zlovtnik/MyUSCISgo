@@ -6,6 +6,9 @@ import wasm from 'vite-plugin-wasm'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), wasm()],
+  css: {
+    postcss: './postcss.config.js',
+  },
   server: {
     headers: {
       // Temporarily disable COEP for development to avoid extension conflicts

@@ -6,24 +6,158 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"MyUSCISgo/pkg/types"
 )
 
-// OAuthToken represents an OAuth 2.0 access token
-type OAuthToken struct {
-	AccessToken string    `json:"access_token"`
-	TokenType   string    `json:"token_type"`
-	ExpiresIn   int       `json:"expires_in"`
-	ExpiresAt   time.Time `json:"expires_at"`
-	Scope       string    `json:"scope,omitempty"`
+// TokenProvider defines the interface for OAuth token generation
+type TokenProvider interface {
+	GenerateToken(ctx context.Context, clientID, clientSecret string) (*types.OAuthToken, error)
+	RefreshToken(ctx context.Context, clientID, clientSecret, refreshToken string) (*types.OAuthToken, error)
+	IsProductionReady() bool
 }
 
-// IsExpired checks if the OAuth token has expired
-func (t *OAuthToken) IsExpired() bool {
-	return time.Now().After(t.ExpiresAt)
+// MockTokenProvider implements TokenProvider for development/testing
+type MockTokenProvider struct{}
+
+// IsProductionReady returns false for MockTokenProvider
+func (m *MockTokenProvider) IsProductionReady() bool {
+	return false
+}
+
+// GenerateToken generates a mock OAuth token for development
+func (m *MockTokenProvider) GenerateToken(ctx context.Context, clientID, clientSecret string) (*types.OAuthToken, error) {
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	// Generate a mock token
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return nil, fmt.Errorf("failed to generate mock token: %w", err)
+	}
+
+	// Create token with expiration (1 hour from now)
+	expiresAt := time.Now().Add(time.Hour)
+
+	token := &types.OAuthToken{
+		AccessToken: hex.EncodeToString(tokenBytes),
+		TokenType:   "Bearer",
+		ExpiresIn:   3600, // 1 hour in seconds
+		ExpiresAt:   expiresAt.Format(time.RFC3339),
+		Scope:       "case-status:read",
+	}
+
+	return token, nil
+}
+
+// RefreshToken refreshes a mock OAuth token
+func (m *MockTokenProvider) RefreshToken(ctx context.Context, clientID, clientSecret, refreshToken string) (*types.OAuthToken, error) {
+	// For mock, just generate a new token
+	return m.GenerateToken(ctx, clientID, clientSecret)
+}
+
+// USCISTokenProvider implements TokenProvider for production USCIS API
+type USCISTokenProvider struct {
+	baseURL string
+}
+
+// IsProductionReady returns true for USCISTokenProvider
+func (u *USCISTokenProvider) IsProductionReady() bool {
+	return true
+}
+
+// GenerateToken generates a real OAuth token from USCIS API
+func (u *USCISTokenProvider) GenerateToken(ctx context.Context, clientID, clientSecret string) (*types.OAuthToken, error) {
+	// TODO: Implement actual USCIS OAuth token generation
+	// This would make HTTP requests to USCIS OAuth endpoints
+	return nil, fmt.Errorf("USCIS token provider not yet implemented")
+}
+
+// RefreshToken refreshes a real OAuth token from USCIS API
+func (u *USCISTokenProvider) RefreshToken(ctx context.Context, clientID, clientSecret, refreshToken string) (*types.OAuthToken, error) {
+	// TODO: Implement actual USCIS token refresh
+	return nil, fmt.Errorf("USCIS token refresh not yet implemented")
+}
+
+// NewTokenProvider creates the appropriate TokenProvider based on environment
+func NewTokenProvider() (TokenProvider, error) {
+	env := strings.ToLower(os.Getenv("APP_ENV"))
+	if env == "" {
+		env = strings.ToLower(os.Getenv("GO_ENV"))
+	}
+	if env == "" {
+		env = "development" // default to development
+	}
+
+	switch env {
+	case "production", "prod":
+		// In production, require USCIS configuration
+		uscisURL := os.Getenv("USCIS_BASE_URL")
+		if uscisURL == "" {
+			return nil, fmt.Errorf("USCIS_BASE_URL environment variable is required in production")
+		}
+
+		return &USCISTokenProvider{
+			baseURL: uscisURL,
+		}, nil
+
+	case "development", "dev", "test":
+		// Allow mock provider in non-production environments
+		return &MockTokenProvider{}, nil
+
+	default:
+		return nil, fmt.Errorf("unsupported APP_ENV: %s", env)
+	}
+}
+
+// EnforceProductionReadiness ensures production environment uses production-ready providers
+func EnforceProductionReadiness(provider TokenProvider) error {
+	env := strings.ToLower(os.Getenv("APP_ENV"))
+	if env == "" {
+		env = strings.ToLower(os.Getenv("GO_ENV"))
+	}
+
+	isProduction := env == "production" || env == "prod"
+
+	if isProduction && !provider.IsProductionReady() {
+		return fmt.Errorf("production environment requires production-ready token provider, but got mock provider")
+	}
+
+	return nil
+}
+
+// Global token provider instance
+var globalTokenProvider TokenProvider
+
+// InitTokenProvider initializes the global token provider
+func InitTokenProvider() error {
+	provider, err := NewTokenProvider()
+	if err != nil {
+		return fmt.Errorf("failed to create token provider: %w", err)
+	}
+
+	if err := EnforceProductionReadiness(provider); err != nil {
+		return fmt.Errorf("token provider validation failed: %w", err)
+	}
+
+	globalTokenProvider = provider
+	return nil
+}
+
+// GetTokenProvider returns the global token provider
+func GetTokenProvider() TokenProvider {
+	if globalTokenProvider == nil {
+		// Fallback to mock provider if not initialized
+		globalTokenProvider = &MockTokenProvider{}
+	}
+	return globalTokenProvider
 }
 
 // HashSecret creates a temporary, time-salted hash of the client secret for transient processing.
@@ -53,46 +187,21 @@ func GenerateSecureToken(clientID string) (string, error) {
 	return hex.EncodeToString(hash[:]), nil
 }
 
-// GenerateOAuthToken generates a mock OAuth token for USCIS API
-// In production, this would make an actual OAuth request to USCIS
-func GenerateOAuthToken(ctx context.Context, clientID, clientSecret string) (*OAuthToken, error) {
-	// Check if context is cancelled
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-	}
-
-	// Generate a secure access token
-	tokenBytes := make([]byte, 32)
-	if _, err := rand.Read(tokenBytes); err != nil {
-		return nil, fmt.Errorf("failed to generate token: %w", err)
-	}
-
-	// Create token with expiration (1 hour from now)
-	expiresAt := time.Now().Add(time.Hour)
-
-	token := &OAuthToken{
-		AccessToken: hex.EncodeToString(tokenBytes),
-		TokenType:   "Bearer",
-		ExpiresIn:   3600, // 1 hour in seconds
-		ExpiresAt:   expiresAt,
-		Scope:       "case-status:read",
-	}
-
-	return token, nil
+// GenerateOAuthToken generates an OAuth token using the configured provider
+func GenerateOAuthToken(ctx context.Context, clientID, clientSecret string) (*types.OAuthToken, error) {
+	provider := GetTokenProvider()
+	return provider.GenerateToken(ctx, clientID, clientSecret)
 }
 
-// RefreshOAuthToken refreshes an expired OAuth token
-// In production, this would make a refresh token request to USCIS
-func RefreshOAuthToken(ctx context.Context, clientID, clientSecret, refreshToken string) (*OAuthToken, error) {
-	// For now, generate a new token (in production, use refresh token)
-	return GenerateOAuthToken(ctx, clientID, clientSecret)
+// RefreshOAuthToken refreshes an expired OAuth token using the configured provider
+func RefreshOAuthToken(ctx context.Context, clientID, clientSecret, refreshToken string) (*types.OAuthToken, error) {
+	provider := GetTokenProvider()
+	return provider.RefreshToken(ctx, clientID, clientSecret, refreshToken)
 }
 
 // ValidateOAuthToken validates an OAuth token format and expiration
 // TODO: Consider injecting time.Now via a var to test edge cases (skew, near-expiry)
-func ValidateOAuthToken(token *OAuthToken) error {
+func ValidateOAuthToken(token *types.OAuthToken) error {
 	if token == nil {
 		return fmt.Errorf("token is nil")
 	}
@@ -101,8 +210,15 @@ func ValidateOAuthToken(token *OAuthToken) error {
 		return fmt.Errorf("access token is empty")
 	}
 
-	if token.IsExpired() {
-		return fmt.Errorf("token has expired")
+	// Check if token is expired by parsing ExpiresAt
+	if token.ExpiresAt != "" {
+		expiresAt, err := time.Parse(time.RFC3339, token.ExpiresAt)
+		if err != nil {
+			return fmt.Errorf("invalid token expiration format: %w", err)
+		}
+		if time.Now().After(expiresAt) {
+			return fmt.Errorf("token has expired")
+		}
 	}
 
 	if token.TokenType != "Bearer" {

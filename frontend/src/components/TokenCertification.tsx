@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { TokenCertificationResult, TokenCertificationData } from '../types';
+import type { FormEvent, ChangeEvent } from 'react';
+import type { TokenCertificationResult, TokenCertificationData, Environment } from '../types';
 import { useWasm } from '../hooks/useWasm';
 
 interface TokenCertificationProps {
@@ -41,7 +42,7 @@ export function TokenCertification({ onSubmit }: TokenCertificationProps) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) {
@@ -89,7 +90,7 @@ export function TokenCertification({ onSubmit }: TokenCertificationProps) {
   type EditableFormKeys = 'token' | 'caseNumber';
 
   const handleInputChange = (field: EditableFormKeys) => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const value = field === 'caseNumber' ? e.target.value.toUpperCase() : e.target.value;
     
@@ -117,10 +118,10 @@ export function TokenCertification({ onSubmit }: TokenCertificationProps) {
     });
   };
 
-  const handleEnvironmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleEnvironmentChange = (e: ChangeEvent<HTMLSelectElement>) => {
     setFormData(prev => ({
       ...prev,
-      environment: e.target.value as 'development' | 'production'
+      environment: e.target.value as Exclude<Environment, 'staging'>
     }));
   };
 

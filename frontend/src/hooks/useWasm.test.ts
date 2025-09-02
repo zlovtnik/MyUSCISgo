@@ -31,11 +31,14 @@ describe('useWasm', () => {
   it('should handle processCredentials when WASM is not loaded', async () => {
     const { result } = renderHook(() => useWasm());
 
-    await expect(result.current.processCredentials({
+    const response = await result.current.processCredentials({
       clientId: 'test',
       clientSecret: 'secret',
       environment: 'development'
-    })).rejects.toThrow('WASM module not loaded');
+    });
+
+    expect(response.success).toBe(false);
+    expect(response.error).toContain('WASM module not loaded');
   });
 
   it('should validate credentials structure', () => {

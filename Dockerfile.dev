@@ -1,0 +1,42 @@
+# Development Dockerfile for Go WASM + React
+FROM node:20-alpine AS frontend-dev
+
+WORKDIR /app
+
+# Copy package files
+COPY frontend/package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy source code
+COPY frontend/ .
+
+# Expose port
+EXPOSE 5173
+
+# Default command
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+
+# Development Go builder
+FROM golang:1.25-alpine AS go-dev
+
+# Install git and ca-certificates
+RUN apk add --no-cache git ca-certificates
+
+WORKDIR /app/go
+
+# Copy go mod files
+COPY go/go.mod go/go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY go/ .
+
+# Expose port
+EXPOSE 8080
+
+# Default command
+CMD ["go", "run", "main.go"]

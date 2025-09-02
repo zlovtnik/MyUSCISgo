@@ -9,6 +9,54 @@ for processing. Enhancements focus on improved security, advanced error handling
 processing, and optimized performance. The integration with Nginx ensures efficient serving of
 static files in production, resulting in a scalable, secure, and easy-to-deploy solution.
 
+## Prerequisites
+
+### Go Version: 1.25
+
+This project uses **Go 1.25** for WebAssembly compilation and backend logic. This version was chosen for:
+
+- **Latest stable features**: Access to the newest Go language features and performance improvements
+- **Enhanced WebAssembly support**: Better WASM compilation and runtime performance
+- **Security updates**: Latest security patches and bug fixes
+- **Future compatibility**: Ensures the project stays current with Go ecosystem developments
+
+#### Installing Go 1.25
+
+```bash
+# Download and install Go 1.25
+# On macOS with Homebrew:
+brew install go@1.25
+
+# On Linux:
+wget https://go.dev/dl/go1.25.0.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.25.0.linux-amd64.tar.gz
+
+# Verify installation
+go version  # Should show go1.25.x
+```
+
+#### Building with Go 1.25
+
+```bash
+# Navigate to the Go source directory
+cd go/
+
+# Ensure go.mod specifies Go 1.25
+head -3 go.mod  # Should show: go 1.25
+
+# Tidy dependencies
+go mod tidy
+
+# Build WASM binary
+GOOS=js GOARCH=wasm go build -o ../frontend/public/main.wasm -ldflags="-s -w" -trimpath
+
+# Copy WASM runtime
+cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" ../frontend/public/
+```
+
+**Note**: The Dockerfile also uses Go 1.25 (`golang:1.25-alpine`) to ensure
+consistent builds across development and production environments.
+
 ## Architecture
 
 ### Development Workflow & Build Pipeline
@@ -320,7 +368,7 @@ sequenceDiagram
 
 ### Setup Phase
 
-- [x] Set up the Go development environment with WebAssembly support (Go 1.21+).
+- [x] Set up the Go development environment with WebAssembly support (Go 1.25+).
 - [x] Create a new React project using Vite for faster bundling and HMR.
 - [x] Organize project structure: `/go` for Go code, `/frontend` for React code, `/nginx` for config files.
 - [x] Configure Vite to handle WASM files (e.g., via plugins for binary loading).
@@ -608,7 +656,7 @@ export default App;
 ### Compiling Go to WASM
 
 ```bash
-# Set environment for WASM (Go 1.21+ optimizations)
+# Set environment for WASM (Go 1.25+ optimizations)
 GOOS=js GOARCH=wasm go build -o public/main.wasm -ldflags="-s -w" -trimpath
 
 # Copy wasm_exec.js

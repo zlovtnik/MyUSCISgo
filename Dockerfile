@@ -8,29 +8,35 @@ RUN apk add --no-cache git ca-certificates
 # Set working directory
 WORKDIR /app/go
 
-# Copy go mod and sum files
+# Copy go.mod to bootstrap
 COPY go/go.mod ./
-COPY go/go.sum ./
 
 # Download dependencies
 RUN go mod download
 
-# Copy the source code
+# Copy the rest of the source code
 COPY go/ .
+
+# Regenerate go.sum if needed
+RUN go mod tidy
 
 # Build WASM
 RUN GOOS=js GOARCH=wasm go build -o /app/main.wasm -ldflags="-s -w" -trimpath
 
 # Copy wasm_exec.js (location varies across Go versions)
-RUN WASM_EXEC_PATH=$(find "$(go env GOROOT)" -name "wasm_exec.js" -type f 2>/dev/null | head -1) && \
-    if [ -n "$WASM_EXEC_PATH" ]; then \
-        cp "$WASM_EXEC_PATH" /app/wasm_exec.js; \
+RUN set -e; \
+    GOROOT=$(go env GOROOT); \
+    if [ -f "$GOROOT/lib/wasm/wasm_exec.js" ]; then \
+        cp "$GOROOT/lib/wasm/wasm_exec.js" /app/wasm_exec.js; \
+    elif [ -f "$GOROOT/misc/wasm/wasm_exec.js" ]; then \
+        cp "$GOROOT/misc/wasm/wasm_exec.js" /app/wasm_exec.js; \
     else \
-        echo "Error: wasm_exec.js not found in Go installation" >&2 && exit 1; \
+        echo "wasm_exec.js not found" >&2; \
+        exit 1; \
     fi
 
-# React build stage
-FROM node:20-alpine AS react-builder
+# Astro build stage
+FROM node:20-alpine AS astro-builder
 
 WORKDIR /app/frontend
 
@@ -39,7 +45,7 @@ COPY frontend/package*.json ./
 
 # Install ALL dependencies (including devDependencies needed for build)
 # Using npm ci for deterministic, fast installs
-RUN npm ci
+RUN npm ci --include=optional
 
 # Copy source code
 COPY frontend/ .
@@ -51,12 +57,25 @@ COPY --from=go-builder /app/wasm_exec.js public/
 # Build the application (devDependencies available during build)
 RUN npm run build
 
+# Clean up node_modules to reduce image size (optional, but keeps build cache clean)
+RUN rm -rf node_modules
+
+# Production dependencies stage (optional - for Node.js runtime if needed)
+FROM node:20-alpine AS production-deps
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+# Install only production dependencies
+RUN npm ci --omit=dev --omit=optional && npm cache clean --force
+
 # Final runtime stage with Nginx (no Node.js runtime needed)
 # Note: If using Node.js runtime instead, use:
 # FROM node:20-alpine AS runtime
-# COPY --from=react-builder /app/frontend/package*.json ./
-# RUN npm ci --omit=dev && npm cache clean --force
-# COPY --from=react-builder /app/frontend/dist ./dist
+# WORKDIR /app/frontend
+# COPY --from=production-deps /app/frontend/node_modules ./node_modules
+# COPY --from=astro-builder /app/frontend/dist ./dist
+# COPY --from=astro-builder /app/frontend/package*.json ./
+# EXPOSE 3000
+# CMD ["npm", "run", "preview"]
 FROM nginx:alpine
 
 # Install security updates
@@ -65,8 +84,8 @@ FROM nginx:alpine
 # Copy custom nginx configuration
 COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy built application from react-builder stage
-COPY --from=react-builder /app/frontend/dist /usr/share/nginx/html
+# Copy built application from astro-builder stage
+COPY --from=astro-builder /app/frontend/dist /usr/share/nginx/html
 
 # Copy WASM files
 COPY --from=go-builder /app/main.wasm /usr/share/nginx/html/

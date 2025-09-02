@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # Development frontend service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"  # Vite dev server
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8080
+    networks:
+      - dev_network
+    command: npm run dev -- --host 0.0.0.0
+
+  # Development backend service (Go WASM)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./go:/app/go
+      - ./main.wasm:/app/main.wasm
+      - ./wasm_exec.js:/app/wasm_exec.js
+    environment:
+      - GO_ENV=development
+      - USCIS_DEV_URL=https://api-int.uscis.gov
+      - USCIS_CLIENT_ID=${USCIS_CLIENT_ID}
+      - USCIS_CLIENT_SECRET=${USCIS_CLIENT_SECRET}
+    networks:
+      - dev_network
+    command: go run main.go
+
+  # Development nginx (for serving built assets)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/dev-server.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./dist:/usr/share/nginx/html:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - dev_network
+    restart: unless-stopped
+
+  # Optional: Redis for development caching
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - dev_network
+    restart: unless-stopped
+
+networks:
+  dev_network:
+    driver: bridge
+
+volumes:
+  node_modules:
